@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
-<title>A'ini ERP — Stock Opname Petugas</title>
+<title>Retail Management System</title>
 <link rel="manifest" href="manifest.json" />
 <link rel="apple-touch-icon" href="apple-touch-icon.png" />
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png" />
@@ -11,7 +11,7 @@
 <meta name="mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-<meta name="apple-mobile-web-app-title" content="A'ini Petugas" />
+<meta name="apple-mobile-web-app-title" content="RMS" />
 <style>
   :root{
     --primary:#2F6FED; --primary-hover:#1E5BDB; --primary-tint:#EAF1FE;
@@ -40,6 +40,9 @@
   .topbar .ic-btn{width:34px;height:34px;border-radius:10px;border:1px solid var(--border);background:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;flex:0 0 auto;font-size:16px;color:var(--gray-700);}
   .topbar .ic-btn:active{background:#F3F4F6;}
   .topbar h1{font-size:16px;font-weight:700;margin:0;flex:1;}
+  .topbar-brand{display:flex;align-items:center;gap:8px;flex:1;min-width:0;}
+  .topbar-brand svg{flex:0 0 auto;}
+  .topbar-brand .name{font-size:14.5px;font-weight:800;letter-spacing:.15px;color:var(--primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .content{flex:1;padding:16px;padding-bottom:100px;overflow-y:auto;}
   .center-content{flex:1;display:flex;flex-direction:column;justify-content:center;padding:28px 24px;}
 
@@ -205,8 +208,12 @@
  *   (status Draft, Items:[])
  * apiGetPenerimaanDetail(token,penerimaanId) -> header + Items, buat resume draft
  * apiCariProdukBarcode(token,barcode) -> produk {ProdukId,Nama,Barcode,HargaBeli}
- *   atau null kalau belum terdaftar
- * apiBuatProdukBaru(token,barcode,nama,kategori,hargaBeli) -> produk baru
+ *   atau null kalau belum terdaftar (fallback ini dipakai kalau katalog belum disinkron)
+ * apiListProdukUntukPenerimaan(token) -> [{ProdukId,Nama,Barcode,HargaBeli}, ...]
+ *   SEMUA produk yang punya barcode - dipakai tombol "Sinkron" di daftar Penerimaan
+ *   Barang, di-cache di memori (state.produkCache) supaya scan barcode berikutnya
+ *   instan tanpa round-trip ke server tiap kali (biar proses penerimaan cepat)
+ * apiBuatProdukBaru(token,barcode,nama,kategori,satuan,hargaBeli,stokAwal) -> produk baru
  * apiSimpanItemPenerimaan(token,penerimaanId,produkId,qty) -> Items terbaru
  *   (insert kalau produk belum ada di daftar, replace qty kalau sudah)
  * apiSelesaikanPenerimaanBarang(token,penerimaanId) -> header final (Status Selesai)
@@ -220,7 +227,7 @@
  * ========================================================================= */
 
 // GANTI dengan URL deployment GAS (`/exec`) proyek utama sebelum dipakai produksi.
-const BACKEND_URL = 'https://script.google.com/macros/s/AKfycbx1EEsMdsTLlrMhbE4Ml87ll4itjI51euT4m68aSFQbkwQow0zB9gKDLEas76ObFPgG/exec';
+const BACKEND_URL = 'https://script.google.com/macros/s/AKfycby8jJ2x6WQZlcjcYmFK4RzzzOFRjRjHpWg1ilRrgiKl9KA4DDIUylEb0rqrofcwlKvg/exec';
 
 const state = {
   token: null,
@@ -252,7 +259,13 @@ const state = {
   penerimaan: null,          // header + Items, penerimaan yang sedang dikerjakan
   produkPenerimaanAktif: null, // produk yang lagi diisi qty-nya
   qtyPenerimaanInput: 0,
-  barcodeBaru: ''            // barcode hasil scan yang belum terdaftar di produk
+  barcodeBaru: '',           // barcode hasil scan yang belum terdaftar di produk
+  // Katalog produk (barcode -> produk) hasil Sinkron - dipakai supaya scan barcode
+  // saat Penerimaan Barang tidak perlu request ke server tiap kali (instan, dari cache
+  // lokal). null = belum pernah sinkron (fallback ke cek server tiap scan seperti biasa).
+  produkCache: null,
+  produkCacheAt: null,
+  produkCacheCount: 0
 };
 
 // ---- Scan Barcode kamera (ZXing) -----------------------------------------
@@ -590,8 +603,34 @@ function bukaPenerimaanDraft(id) {
   });
 }
 
+// Download SEMUA produk (barcode -> data produk) sekali, simpan di memori (state.produkCache).
+// Setelah ini, scan barcode saat Penerimaan Barang tidak perlu tunggu network lagi -
+// tinggal cek ke cache lokal, jadi jauh lebih cepat (langsung ke layar Qty tanpa delay).
+function sinkronKatalogProduk() {
+  guarded(async function () {
+    const list = await api('apiListProdukUntukPenerimaan', { token: state.token });
+    const map = {};
+    (list || []).forEach(function (p) { if (p.Barcode) map[p.Barcode] = p; });
+    state.produkCache = map;
+    state.produkCacheAt = new Date();
+    state.produkCacheCount = (list || []).length;
+    showToast('Katalog tersinkron: ' + state.produkCacheCount + ' produk.');
+  });
+}
+
 // Dipanggil begitu barcode kebaca kamera saat di layar scan Penerimaan.
 function cariProdukPenerimaan(barcode) {
+  // Sudah pernah Sinkron Katalog -> cek ke cache lokal dulu, TANPA request ke server.
+  // Instan: kalau ketemu langsung ke layar Qty, kalau tidak ketemu langsung dianggap
+  // produk baru (karena katalog sudah lengkap, tidak perlu double-check ke server lagi).
+  if (state.produkCache) {
+    const produk = state.produkCache[barcode];
+    if (produk) { bukaQtyPenerimaan(produk); return; }
+    state.barcodeBaru = barcode;
+    goto('penerimaan-produk-baru');
+    return;
+  }
+  // Belum pernah Sinkron Katalog - fallback ke cara lama (cek ke server tiap scan).
   guarded(async function () {
     const produk = await api('apiCariProdukBarcode', { token: state.token, barcode: barcode });
     if (produk) {
@@ -630,8 +669,11 @@ function simpanQtyPenerimaan() {
 function submitProdukBaruPenerimaan(nama, kategori, satuan, hargaBeli) {
   guarded(async function () {
     const produk = await api('apiBuatProdukBaru', {
-      token: state.token, barcode: state.barcodeBaru, nama: nama, kategori: kategori, satuan: satuan, hargaBeli: hargaBeli
+      token: state.token, barcode: state.barcodeBaru, nama: nama, kategori: kategori, satuan: satuan, hargaBeli: hargaBeli, stokAwal: 0
     });
+    // Masukkan juga ke cache lokal (kalau sudah pernah Sinkron Katalog) supaya kalau
+    // barcode yang sama kescan lagi di sesi ini, langsung ketemu tanpa ke server.
+    if (state.produkCache && produk && produk.Barcode) state.produkCache[produk.Barcode] = produk;
     state.barcodeBaru = '';
     bukaQtyPenerimaan(produk);
   });
@@ -736,7 +778,7 @@ function simpanKoreksiSelisih() {
     state.selisihItem = updated;
     goto('selisih-list');
     const selBaru = Number(updated.StokFisik) - Number(updated.StokSistem);
-    showToast('Tersimpan. Sistem ' + updated.StokSistem + ', Selisih ' + (selBaru > 0 ? '+' : '') + selBaru + '.');
+    showToast('Tersimpan. Sistem -, Selisih ' + (selBaru > 0 ? '+' : '') + selBaru + '.');
   });
 }
 
@@ -878,11 +920,11 @@ const VIEWS = {
             '<polyline points="70,66 74,70 82,61" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>' +
           '</svg>' +
         '</div>' +
-        '<div class="login-title">STOCK OPNAME</div>' +
+        '<div class="login-title" style="font-size:17px;">RETAIL MANAGEMENT SYSTEM</div>' +
         '<div class="login-subtitle">Inventory Counting System</div>' +
         '<div class="login-divider"></div>' +
         '<div class="login-welcome">Welcome Back</div>' +
-        '<div class="login-welcome-sub">Please log in to access the Stock Opname system</div>' +
+        '<div class="login-welcome-sub">Please log in to access the Retail Management System</div>' +
         '<div class="field"><label>Username</label><div class="field-icon">' +
           '<span class="ic"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.5-7 8-7s8 3 8 7"/></svg></span>' +
           '<input type="text" id="in-username" placeholder="Enter your username" />' +
@@ -911,7 +953,15 @@ const VIEWS = {
     const sesiMulai = state.sesiList.filter(sesiMasukMulai);
     const sesiEdit = state.sesiList.filter(sesiMasukEdit);
     return '' +
-    '<div class="topbar"><button class="ic-btn" data-act="logout">←</button><h1>A\'ini ERP — Stock Opname</h1><button class="ic-btn">☰</button></div>' +
+    '<div class="topbar"><button class="ic-btn" data-act="logout">←</button>' +
+      '<div class="topbar-brand">' +
+        '<svg width="22" height="22" viewBox="0 0 100 100">' +
+          '<polygon points="50,6 90,28 90,72 50,94 10,72 10,28" fill="none" stroke="#1A3A8F" stroke-width="7"/>' +
+          '<polyline points="34,52 45,63 68,38" fill="none" stroke="#22C55E" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>' +
+        '</svg>' +
+        '<span class="name">Retail Management System</span>' +
+      '</div>' +
+      '<button class="ic-btn">☰</button></div>' +
     '<div class="content">' +
       '<div class="info-box"><div><b>Halo, ' + esc((state.user && state.user.FullName) || 'Petugas') + '</b>Pilih menu di bawah untuk melanjutkan.</div></div>' +
       '<div class="card card-clickable" data-act="goto-penerimaan" style="cursor:pointer;display:flex;align-items:center;gap:14px;">' +
@@ -958,8 +1008,20 @@ const VIEWS = {
     }).join('');
     return '' +
     '<div class="topbar"><button class="ic-btn" data-act="back-to-home">←</button><h1>Penerimaan Barang</h1>' +
+      '<button class="ic-btn" data-act="sinkron-katalog-produk" style="margin-right:6px;"' + (state.loading ? ' disabled' : '') + '>☁</button>' +
       '<button class="ic-btn" data-act="goto-penerimaan-buat">+</button></div>' +
     '<div class="content">' +
+      '<div class="card" style="display:flex;align-items:center;gap:10px;">' +
+        '<div style="flex:1;">' +
+          '<div style="font-weight:800;font-size:13.5px;">Katalog Produk (untuk Scan)</div>' +
+          '<div class="lbl" style="margin-top:2px;">' +
+            (state.produkCache
+              ? state.produkCacheCount + ' produk • tersinkron ' + fmtWaktu(state.produkCacheAt)
+              : 'Belum disinkron - scan barcode masih cek ke server tiap kali') +
+          '</div>' +
+        '</div>' +
+        '<button class="btn btn-primary" style="width:auto;padding:9px 14px;font-size:13px;" data-act="sinkron-katalog-produk"' + (state.loading ? ' disabled' : '') + '>' + (state.produkCache ? 'Sinkron Ulang' : 'Sinkron') + '</button>' +
+      '</div>' +
       '<div class="chip-row">' +
         ['SEMUA', 'DRAFT', 'SELESAI'].map(function (f) {
           return '<button class="chip' + (state.penerimaanFilter === f ? ' active' : '') + '" data-act="filter-penerimaan" data-f="' + f + '">' + f.charAt(0) + f.slice(1).toLowerCase() + '</button>';
@@ -1009,6 +1071,8 @@ const VIEWS = {
         '<div class="row"><span class="lbl">No. Nota</span><span class="val">' + esc(p.NoNota || '-') + '</span></div>' +
         '<div class="row"><span class="lbl">Tanggal</span><span class="val">' + fmtTanggal(p.Tanggal) + '</span></div>' +
       '</div>' +
+      (!state.produkCache ?
+        '<div class="info-box" style="margin-bottom:14px;"><div><b>Katalog belum disinkron</b>Scan barcode masih cek ke server tiap kali (lebih lambat). Kembali ke daftar Penerimaan dan tekan tombol Sinkron dulu biar scan lebih cepat.</div></div>' : '') +
       '<button class="btn btn-primary" data-act="buka-scan" style="margin-bottom:14px;">📷 Scan Barcode Produk</button>' +
       '__ERROR__' +
       '<div class="row" style="padding:0 2px 8px;"><span class="lbl">Barang Diterima</span><span class="val">' + items.length + ' item • ' + totalQty + ' qty</span></div>' +
@@ -1273,7 +1337,7 @@ const VIEWS = {
       return '<div class="produk-item" data-act="buka-edit-selisih" data-id="' + i.ProdukId + '">' +
         '<div class="thumb">📦</div>' +
         '<div class="info"><div class="nama">' + esc(i.Nama) + '</div><div class="meta">' + esc(i.Barcode || '-') + ' · Rak ' + esc(i.Rak || '-') + '</div></div>' +
-        '<div class="right"><div class="sf selisih ' + selCls + '" style="margin:0;">' + (sel > 0 ? '+' : '') + sel + '</div><div class="sf-label">Sistem ' + i.StokSistem + ' · Fisik ' + i.StokFisik + '</div></div>' +
+        '<div class="right"><div class="sf selisih ' + selCls + '" style="margin:0;">' + (sel > 0 ? '+' : '') + sel + '</div><div class="sf-label">Sistem - · Fisik ' + i.StokFisik + '</div></div>' +
         '<div class="chev">›</div>' +
       '</div>';
     }).join('');
@@ -1538,6 +1602,7 @@ function handleAction(act, el) {
   if (act === 'goto-list-mulai') { state.listOrigin = 'mulai'; goto('list-mulai'); refreshSesiListSilent(); return; }
   if (act === 'goto-list-edit') { state.listOrigin = 'edit'; goto('list-edit'); refreshSesiListSilent(); return; }
   if (act === 'goto-penerimaan') { bukaPenerimaanList(); return; }
+  if (act === 'sinkron-katalog-produk') { sinkronKatalogProduk(); return; }
   if (act === 'goto-penerimaan-buat') { goto('penerimaan-buat'); return; }
   if (act === 'back-to-penerimaan-list') { bukaPenerimaanList(); return; }
   if (act === 'filter-penerimaan') { state.penerimaanFilter = el.getAttribute('data-f'); render(); return; }
