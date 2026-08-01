@@ -1,6 +1,6 @@
 {
-  "name": "A'ini ERP — Petugas",
-  "short_name": "A'ini Petugas",
+  "name": "Retail Management System",
+  "short_name": "RMS",
   "description": "App mobile Petugas: Stock Opname & Penerimaan Barang",
   "start_url": "./index.html",
   "scope": "./",
