@@ -1,0 +1,2101 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+<title>Retail Management System</title>
+<link rel="manifest" href="manifest.json" />
+<link rel="apple-touch-icon" href="apple-touch-icon.png" />
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png" />
+<meta name="theme-color" content="#2F6FED" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="default" />
+<meta name="apple-mobile-web-app-title" content="RMS" />
+<style>
+  :root{
+    --primary:#2F6FED; --primary-hover:#1E5BDB; --primary-tint:#EAF1FE;
+    --success:#22C55E; --success-tint:#EAFBF1;
+    --warning:#F59E0B; --warning-tint:#FEF6E7;
+    --info:#3B82F6; --info-tint:#EAF1FE;
+    --danger:#EF4444; --danger-tint:#FDEDED;
+    --gray-900:#111827; --gray-700:#374151; --gray-500:#6B7280; --gray-300:#D1D5DB;
+    --border:#E5E7EB; --bg:#F6F7FB; --card:#FFFFFF;
+    --radius:14px; --radius-lg:18px;
+  }
+  *{box-sizing:border-box;}
+  button,.card-clickable,.produk-item,.chip,.scan-btn,.stepper button,.toggle,.ic-btn{transition:background .12s ease,transform .1s ease,border-color .12s ease;}
+  button:active,.card-clickable:active,.produk-item:active,.chip:active,.scan-btn:active,.stepper button:active,.ic-btn:active{transform:scale(0.96);}
+  .tap-flash{transform:scale(0.96) !important;}
+  .card-clickable.tap-flash{background:#EAF1FE !important;}
+  .produk-item.tap-flash{background:#EEF3FF !important;}
+  .chip.tap-flash{background:#DCE7FB !important;}
+  .ic-btn.tap-flash,.scan-btn.tap-flash,.stepper.tap-flash button.tap-flash{background:#E5E9F0 !important;}
+  .btn-primary.tap-flash{background:var(--primary-hover) !important;}
+  .btn-outline.tap-flash{background:#F3F4F6 !important;}
+  html,body{margin:0;padding:0;background:#EEF0F4;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:var(--gray-900);touch-action:manipulation;-webkit-tap-highlight-color:transparent;}
+  #shell{max-width:420px;margin:0 auto;min-height:100vh;background:var(--bg);display:flex;flex-direction:column;position:relative;}
+  .statusbar{height:14px;}
+  .topbar{display:flex;align-items:center;gap:10px;padding:14px 16px;background:var(--card);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:5;}
+  .topbar .ic-btn{width:34px;height:34px;border-radius:10px;border:1px solid var(--border);background:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;flex:0 0 auto;font-size:16px;color:var(--gray-700);}
+  .topbar .ic-btn:active{background:#F3F4F6;}
+  .topbar h1{font-size:16px;font-weight:700;margin:0;flex:1;}
+  .topbar-brand{display:flex;align-items:center;gap:8px;flex:1;min-width:0;}
+  .topbar-brand svg{flex:0 0 auto;}
+  .topbar-brand .name{font-size:14.5px;font-weight:800;letter-spacing:.15px;color:var(--primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .content{flex:1;padding:16px;padding-bottom:100px;overflow-y:auto;}
+  .center-content{flex:1;display:flex;flex-direction:column;justify-content:center;padding:28px 24px;}
+
+  .card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px;margin-bottom:14px;}
+  .card-clickable{transition:background .1s,transform .1s;}
+  .card-clickable:active{background:#EAF1FE;}
+  .row{display:flex;justify-content:space-between;gap:10px;padding:6px 0;font-size:13px;}
+  .row .lbl{color:var(--gray-500);}
+  .row .val{color:var(--gray-900);font-weight:600;text-align:right;}
+
+  .badge{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:700;padding:4px 10px;border-radius:999px;}
+  .badge.warning{background:var(--warning-tint);color:#B45309;}
+  .badge.info{background:var(--info-tint);color:#1D4ED8;}
+  .badge.success{background:var(--success-tint);color:#15803D;}
+  .badge.neutral{background:#F3F4F6;color:var(--gray-700);}
+  .badge.danger{background:var(--danger-tint);color:#B91C1C;}
+
+  .btn{width:100%;padding:14px;border-radius:12px;font-size:15px;font-weight:700;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;}
+  .btn-primary{background:var(--primary);color:#fff;}
+  .btn-primary:active{background:var(--primary-hover);}
+  .btn-outline{background:#fff;border:1.5px solid var(--border);color:var(--gray-700);}
+  .btn-danger-outline{background:#fff;border:1.5px solid #FCA5A5;color:var(--danger);}
+  .btn[disabled]{opacity:.45;pointer-events:none;}
+  .btn-row{display:flex;gap:10px;}
+  .btn-row .btn{flex:1;}
+
+  .field{margin-bottom:16px;}
+  .field label{display:block;font-size:13px;font-weight:600;color:var(--gray-700);margin-bottom:6px;}
+  .field input[type=text],.field input[type=password],.field input[type=date],.field textarea,.field select{
+    width:100%;padding:12px 14px;border:1.5px solid var(--border);border-radius:12px;font-size:14px;background:#fff;color:var(--gray-900);
+  }
+  .field select{appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%236B7280' stroke-width='2'><polyline points='6 9 12 15 18 9'/></svg>");background-repeat:no-repeat;background-position:right 14px center;}
+  .field input:focus,.field textarea:focus,.field select:focus{outline:none;border-color:var(--primary);}
+  .pw-wrap{position:relative;}
+  .pw-wrap .toggle{position:absolute;right:12px;top:50%;transform:translateY(-50%);cursor:pointer;color:var(--gray-500);font-size:13px;background:none;border:none;}
+  .checkbox-row{display:flex;align-items:center;justify-content:space-between;font-size:13px;margin-bottom:22px;}
+  .checkbox-row label{display:flex;align-items:center;gap:7px;color:var(--gray-700);}
+  .checkbox-row a{color:var(--primary);text-decoration:none;font-weight:600;}
+
+  .info-box{display:flex;gap:10px;background:var(--info-tint);border-radius:var(--radius);padding:12px 14px;margin-bottom:16px;font-size:12.5px;color:#1D4ED8;line-height:1.5;}
+  .info-box.success{background:var(--success-tint);color:#15803D;}
+  .info-box b{display:block;margin-bottom:2px;font-size:13px;}
+  .info-box ul{margin:4px 0 0;padding-left:16px;}
+
+  .logo-wrap{text-align:center;margin-bottom:28px;}
+  .logo-wrap .mark{font-size:26px;font-weight:800;color:var(--gray-900);}
+  .logo-wrap .sub{color:var(--gray-500);font-size:13px;margin-top:14px;}
+  .logo-wrap h2{font-size:19px;margin:2px 0 0;}
+
+  .login-shell{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:28px 18px;position:relative;overflow:hidden;background:linear-gradient(180deg,#EAF0F8 0%,#DCE6F2 100%);}
+  .login-shell .shelf-bg{position:absolute;inset:0;opacity:.55;filter:blur(4px);z-index:0;}
+  .login-shell .shelf-bg .col{position:absolute;top:0;bottom:0;width:30%;}
+  .login-shell .shelf-bg .col.l{left:-4%;}
+  .login-shell .shelf-bg .col.r{right:-4%;}
+  .login-shell .shelf-bg .beam{position:absolute;left:8%;right:8%;height:6px;background:#8FA3C4;}
+  .login-shell .shelf-bg .post{position:absolute;top:0;bottom:0;width:6px;background:#7A90B8;}
+  .login-shell .shelf-bg .box{position:absolute;border-radius:2px;box-shadow:inset 0 0 0 1px rgba(0,0,0,.08);}
+  .login-card{background:#fff;border-radius:26px;padding:34px 26px 26px;position:relative;z-index:1;width:100%;max-width:360px;box-shadow:0 30px 70px rgba(10,25,65,.28);}
+  .login-icon{width:98px;height:98px;margin:0 auto 14px;position:relative;}
+  .login-title{text-align:center;font-size:21px;font-weight:800;letter-spacing:.5px;color:var(--gray-900);}
+  .login-subtitle{text-align:center;font-size:13px;color:var(--gray-500);margin-top:2px;}
+  .login-divider{width:46px;height:3px;background:var(--primary);border-radius:99px;margin:14px auto 18px;opacity:.35;}
+  .login-welcome{text-align:center;font-size:19px;font-weight:800;color:var(--gray-900);margin-bottom:4px;}
+  .login-welcome-sub{text-align:center;font-size:12.5px;color:var(--gray-500);margin-bottom:22px;}
+  .field-icon{position:relative;}
+  .field-icon .ic{position:absolute;left:14px;top:50%;transform:translateY(-50%);color:var(--gray-500);display:flex;}
+  .field-icon .ic svg{display:block;}
+  .field-icon input{padding-left:40px !important;}
+  .field input[type=text]:focus,.field input[type=password]:focus{box-shadow:0 0 0 3px var(--primary-tint);}
+  .toggle svg{display:block;}
+  .btn-gradient{background:linear-gradient(90deg,#1A3A8F 0%,#2F6FED 100%) !important;}
+  .login-footer{display:flex;align-items:center;justify-content:center;gap:6px;margin-top:18px;font-size:11.5px;color:var(--gray-500);}
+  .login-footer svg{display:block;}
+
+  .progress-wrap{margin-bottom:14px;}
+  .progress-top{display:flex;justify-content:space-between;font-size:12px;color:var(--gray-500);margin-bottom:6px;}
+  .progress-track{height:8px;background:#E5E7EB;border-radius:999px;overflow:hidden;}
+  .progress-fill{height:100%;background:var(--primary);border-radius:999px;transition:width .25s;}
+  .stat-row{display:flex;gap:8px;margin:12px 0 14px;}
+  .stat{flex:1;background:#fff;border:1px solid var(--border);border-radius:12px;padding:10px;text-align:center;}
+  .stat .n{font-size:17px;font-weight:800;}
+  .stat .l{font-size:10.5px;color:var(--gray-500);margin-top:2px;}
+
+  .chip-row{display:flex;gap:8px;margin-bottom:12px;overflow-x:auto;}
+  .chip{flex:0 0 auto;padding:8px 14px;border-radius:999px;border:1.5px solid var(--border);background:#fff;font-size:12.5px;font-weight:600;color:var(--gray-700);cursor:pointer;white-space:nowrap;}
+  .chip:active{background:#F3F4F6;border-color:var(--gray-300);}
+  .chip.active{background:var(--primary);border-color:var(--primary);color:#fff;}
+
+  .search-box{display:flex;align-items:center;gap:8px;background:#fff;border:1.5px solid var(--border);border-radius:12px;padding:10px 12px;margin-bottom:14px;}
+  .search-box input{border:none;outline:none;flex:1;font-size:13.5px;background:transparent;}
+  .search-box .ic{color:var(--gray-500);font-size:15px;}
+
+  .produk-item{display:flex;align-items:center;gap:12px;background:#fff;border:1px solid var(--border);border-radius:14px;padding:12px;margin-bottom:10px;cursor:pointer;}
+  .produk-item:active{background:#EEF3FF;}
+  .produk-item .thumb{width:42px;height:42px;border-radius:10px;background:var(--primary-tint);display:flex;align-items:center;justify-content:center;font-size:18px;flex:0 0 auto;}
+  .produk-item .thumb.done{background:var(--success-tint);}
+  .produk-item .info{flex:1;min-width:0;}
+  .produk-item .nama{font-size:14px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .produk-item .meta{font-size:11.5px;color:var(--gray-500);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .produk-item .right{text-align:right;flex:0 0 auto;}
+  .produk-item .right .sf{font-size:13px;font-weight:700;}
+  .produk-item .right .sf-label{font-size:10px;color:var(--gray-500);}
+  .produk-item .chev{color:var(--gray-300);font-size:16px;}
+  .empty-state{text-align:center;padding:40px 20px;color:var(--gray-500);font-size:13px;}
+
+  .stepper{display:flex;align-items:center;gap:12px;justify-content:center;margin:6px 0 4px;}
+  .stepper button{width:46px;height:46px;border-radius:12px;border:1.5px solid var(--border);background:#fff;font-size:22px;font-weight:700;color:var(--gray-700);cursor:pointer;}
+  .stepper button:active{background:#F3F4F6;}
+  .stepper input{width:90px;text-align:center;font-size:24px;font-weight:800;border:none;background:transparent;}
+  .selisih{text-align:center;font-size:13px;font-weight:700;margin-bottom:6px;}
+  .selisih.neg{color:var(--danger);}
+  .selisih.pos{color:var(--success);}
+  .selisih.zero{color:var(--gray-500);}
+  .char-count{text-align:right;font-size:11px;color:var(--gray-500);margin-top:4px;}
+
+  .footer-fixed{position:sticky;bottom:0;background:var(--card);border-top:1px solid var(--border);padding:12px 16px;max-width:420px;margin:0 auto;width:100%;}
+
+  .center-icon{width:84px;height:84px;border-radius:50%;background:var(--success-tint);display:flex;align-items:center;justify-content:center;margin:0 auto 18px;font-size:40px;color:var(--success);}
+  .center-icon.blue{background:var(--info-tint);color:var(--info);}
+  .center-title{text-align:center;font-size:20px;font-weight:800;margin-bottom:6px;}
+  .center-sub{text-align:center;font-size:13px;color:var(--gray-500);margin-bottom:22px;line-height:1.5;padding:0 6px;}
+
+  .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#111827;color:#fff;padding:10px 18px;border-radius:10px;font-size:13px;z-index:50;max-width:340px;text-align:center;}
+  .spinner{width:16px;height:16px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+  .err-text{color:var(--danger);font-size:12.5px;margin:-8px 0 14px;}
+  a{color:inherit;}
+
+  .search-box .scan-btn{flex:0 0 auto;width:34px;height:34px;border-radius:9px;border:1.5px solid var(--border);background:#fff;display:flex;align-items:center;justify-content:center;font-size:15px;cursor:pointer;color:var(--gray-700);}
+  .search-box .scan-btn:active{background:#F3F4F6;}
+
+  #scan-shell{position:fixed;inset:0;background:#000;z-index:60;display:flex;flex-direction:column;max-width:420px;margin:0 auto;}
+  #scan-video{flex:1;width:100%;height:100%;object-fit:cover;background:#000;}
+  .scan-topbar{position:absolute;top:0;left:0;right:0;display:flex;align-items:center;gap:10px;padding:14px 16px;z-index:2;}
+  .scan-topbar .ic-btn{width:34px;height:34px;border-radius:10px;border:none;background:rgba(0,0,0,.5);color:#fff;display:flex;align-items:center;justify-content:center;font-size:16px;cursor:pointer;}
+  .scan-topbar h1{color:#fff;font-size:15px;font-weight:700;margin:0;flex:1;text-shadow:0 1px 3px rgba(0,0,0,.5);}
+  .scan-frame{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:78%;max-width:300px;aspect-ratio:5/3;border:2.5px solid #fff;border-radius:16px;box-shadow:0 0 0 2000px rgba(0,0,0,.45);}
+  .scan-hint{position:absolute;left:0;right:0;bottom:110px;text-align:center;color:#fff;font-size:12.5px;padding:0 30px;text-shadow:0 1px 3px rgba(0,0,0,.5);}
+  .scan-state{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:28px;text-align:center;color:#fff;z-index:3;background:rgba(17,24,39,.92);}
+  .scan-state .ic{font-size:34px;}
+</style>
+</head>
+<body ontouchstart="">
+<div id="shell"></div>
+
+<!-- Scan Barcode kamera: ZXing (decode Code128/EAN/dll dari video stream). CDN, app ini
+     berdiri sendiri (bukan bagian repo GAS), pola sama JsBarcode CDN di Index.html repo utama. -->
+<script src="https://unpkg.com/@zxing/library@0.21.3/umd/index.min.js"></script>
+
+<script>
+/* =========================================================================
+ * A'ini ERP — Mobile Stock Opname (Petugas)
+ * App TERPISAH (di luar repo GAS utama, keputusan Product Owner 29 Juli 2026).
+ * Konsumsi backend lewat doPost whitelist (Code.js), BUKAN google.script.run
+ * (itu cuma jalan di dalam HTML Service GAS sendiri) - lihat SYNC_ACTIONS baru:
+ * apiLogin / apiListStockOpnameUntukPetugas / apiGetStockOpnameDetailUntukPetugas /
+ * apiInputStokFisikPetugas / apiSelesaikanOpnamePetugas.
+ *
+ * Modul Penerimaan Barang (baru) butuh whitelist action tambahan di backend:
+ * apiListPenerimaanBarang(token) -> [{Id,NomorPenerimaan,Supplier,NoNota,Tanggal,
+ *   Status,TotalQty,TotalNilai}]
+ * apiBuatPenerimaanBarang(token,supplier,noNota,tanggal,catatan) -> header baru
+ *   (status Draft, Items:[])
+ * apiGetPenerimaanDetail(token,penerimaanId) -> header + Items, buat resume draft
+ * apiCariProdukBarcode(token,barcode) -> produk {ProdukId,Nama,Barcode,HargaBeli}
+ *   atau null kalau belum terdaftar (fallback ini dipakai kalau katalog belum disinkron)
+ * apiListProdukUntukPenerimaan(token) -> [{ProdukId,Nama,Barcode,HargaBeli}, ...]
+ *   SEMUA produk yang punya barcode - dipakai tombol "Sinkron" di daftar Penerimaan
+ *   Barang, di-cache di memori (state.produkCache) supaya scan barcode berikutnya
+ *   instan tanpa round-trip ke server tiap kali (biar proses penerimaan cepat)
+ * apiBuatProdukBaru(token,barcode,nama,kategori,satuan,hargaBeli,stokAwal) -> produk baru
+ * apiSimpanItemPenerimaan(token,penerimaanId,produkId,qty) -> Items terbaru
+ *   (insert kalau produk belum ada di daftar, replace qty kalau sudah)
+ * apiSelesaikanPenerimaanBarang(token,penerimaanId) -> header final (Status Selesai)
+ * Backend belum tersedia di sesi ini - frontend di bawah sudah siap pakai
+ * kontrak ini, tinggal disambungkan begitu action di Code.js dibuat.
+ *
+ * Scope sengaja ONLINE-ONLY (keputusan PO): setiap aksi langsung fetch() ke server,
+ * TIDAK ada local store/offline queue/sync engine di app ini - beda dari POS Offline-
+ * First (TDD_Offline_First_POS). Badge/istilah "tersimpan di server" dipakai apa
+ * adanya, bukan "di perangkat" (supaya tidak mengklaim kemampuan yang belum dibangun).
+ * ========================================================================= */
+
+// GANTI dengan URL deployment GAS (`/exec`) proyek utama sebelum dipakai produksi.
+const BACKEND_URL = 'https://script.google.com/macros/s/AKfycbzFdeVxWbxRuilpssm1k0oHuTJ_8WcUjFVpMrxkCIS0mGMka3Y83UjCHwb8cYxsc8RP/exec';
+
+// Pengantaran Online sekarang tersambung ke backend sungguhan (PesananOnlineController.js,
+// lewat doPost - lihat apiListPengantaranUntukPetugas/apiMulaiPengantaran/
+// apiSelesaikanPengantaranOnline di bagian bawah). Bukan dummy lagi - state.pengantaranList
+// diisi dari server oleh refreshPengantaranListSilent()/initApp(), lihat pengMapDariServer().
+
+const state = {
+  token: null,
+  user: null,
+  view: 'login',
+  loading: false,
+  error: '',
+  showPw: false,
+  sesiList: [],
+  sesi: null,        // header + Items + progress, sesi yang sedang dibuka
+  listOrigin: 'mulai', // 'mulai' | 'edit' - dari menu mana Detail Sesi dibuka, dipakai tombol back
+  filter: 'SEMUA',    // SEMUA | SUDAH | BELUM
+  search: '',
+  selisihFilter: 'SEMUA', // SEMUA | MINUS | PLUS (Daftar Selisih)
+  selisihItem: null,       // item aktif di layar Edit Selisih / Riwayat Edit
+  stokKoreksiInput: 0,
+  catatanKoreksiInput: '',
+  lastSync: null,          // Date terakhir Sinkron Sekarang berhasil
+  toastMsg: '',
+  activeItem: null,   // item Produk yang sedang diinput di layar Input Stok Fisik
+  stokFisikInput: 0,
+  catatanInput: '',
+  scanState: 'starting', // starting | live | denied | notfound
+  scanNotFoundBarcode: '',
+
+  // ---- Penerimaan Barang -------------------------------------------------
+  penerimaanList: [],
+  penerimaanFilter: 'SEMUA', // SEMUA | DRAFT | SELESAI
+  penerimaan: null,          // header + Items, penerimaan yang sedang dikerjakan
+  produkPenerimaanAktif: null, // produk yang lagi diisi qty-nya
+  qtyPenerimaanInput: 0,
+  barcodeBaru: '',           // barcode hasil scan yang belum terdaftar di produk
+  // Katalog produk (barcode -> produk) hasil Sinkron - dipakai supaya scan barcode
+  // saat Penerimaan Barang tidak perlu request ke server tiap kali (instan, dari cache
+  // lokal). null = belum pernah sinkron (fallback ke cek server tiap scan seperti biasa).
+  produkCache: null,
+  produkCacheAt: null,
+  produkCacheCount: 0,
+
+  // ---- Pengantaran Online (§ tampilan mobile petugas kurir) --------------
+  // TAHAP UI/UX SAJA (pola sama Promosi) - data dummy lokal, belum ada endpoint
+  // apiListPengantaranOnline dkk di backend, murni buat tunjukin alur layar.
+  pengantaranList: [],
+  pengantaranError: '', // BARU - beda dari 'Belum ada pesanan' asli, ini nandain fetch API-nya gagal (server error/URL Web App belum di-deploy ulang/dst), diisi refreshPengantaranListSilent()
+  pengantaranFilter: 'DIPROSES', // DIPROSES | DIANTAR | SELESAI
+  pengantaranAktif: null,        // pesanan yang sedang dibuka/diantar
+  pengantaranFoto: null,         // dataURL foto bukti hasil AMBIL FOTO/GALERI
+  pengantaranCatatan: ''
+};
+
+// ---- Scan Barcode kamera (ZXing) -----------------------------------------
+// Video/reader hidup DI LUAR render() (bukan bagian VIEWS) supaya tidak ikut
+// dibongkar-pasang tiap render() lain berjalan - overlay #scan-shell disuntik
+// manual ke <body>, terpisah dari innerHTML shell utama.
+let zxingReader = null;
+let zxingStream = null;
+
+function bukaScan() {
+  state.scanState = 'starting';
+  state.scanNotFoundBarcode = '';
+  renderScanOverlay();
+  startScanner();
+}
+
+function tutupScan() {
+  stopScanner();
+  const el = document.getElementById('scan-shell');
+  if (el) el.remove();
+}
+
+function renderScanOverlay() {
+  let existing = document.getElementById('scan-shell');
+  if (!existing) {
+    existing = document.createElement('div');
+    existing.id = 'scan-shell';
+    document.body.appendChild(existing);
+  }
+  let overlayHtml = '';
+  if (state.scanState === 'denied') {
+    overlayHtml = '<div class="scan-state">' +
+      '<div class="ic">🚫</div>' +
+      '<div style="font-weight:700;font-size:15px;">Kamera tidak dapat diakses</div>' +
+      '<div style="font-size:12.5px;color:#D1D5DB;">Izinkan akses kamera di pengaturan browser, atau cari produk lewat nama.</div>' +
+      '<div class="btn-row" style="width:100%;margin-top:6px;">' +
+        '<button class="btn btn-outline" data-act="scan-tutup">Ketik Manual</button>' +
+        '<button class="btn btn-primary" data-act="scan-coba-lagi">Coba Lagi</button>' +
+      '</div>' +
+    '</div>';
+  } else if (state.scanState === 'notfound') {
+    overlayHtml = '<div class="scan-state">' +
+      '<div class="ic">❓</div>' +
+      '<div style="font-weight:700;font-size:15px;">Barcode tidak ditemukan</div>' +
+      '<div style="font-size:12.5px;color:#D1D5DB;">"' + esc(state.scanNotFoundBarcode) + '" tidak ada di daftar produk sesi ini.</div>' +
+      '<div class="btn-row" style="width:100%;margin-top:6px;">' +
+        '<button class="btn btn-outline" data-act="scan-tutup">Tutup</button>' +
+        '<button class="btn btn-primary" data-act="scan-coba-lagi">Scan Lagi</button>' +
+      '</div>' +
+    '</div>';
+  }
+  existing.innerHTML =
+    '<div class="scan-topbar"><button class="ic-btn" data-act="scan-tutup">←</button><h1>Scan Barcode Produk</h1><div style="width:34px;"></div></div>' +
+    '<video id="scan-video" autoplay muted playsinline></video>' +
+    (state.scanState === 'live' ? '<div class="scan-frame"></div><div class="scan-hint">Arahkan kamera ke barcode produk</div>' : '') +
+    overlayHtml;
+  existing.querySelectorAll('[data-act]').forEach(function (el) {
+    el.addEventListener('click', function () { handleAction(el.getAttribute('data-act'), el); });
+  });
+}
+
+async function startScanner() {
+  if (!window.ZXing) {
+    state.scanState = 'denied';
+    renderScanOverlay();
+    return;
+  }
+  try {
+    zxingReader = new ZXing.BrowserMultiFormatReader();
+    const devices = await zxingReader.listVideoInputDevices();
+    const backCam = devices.find(function (d) { return /back|rear|environment/i.test(d.label); });
+    const deviceId = backCam ? backCam.deviceId : (devices[0] ? devices[0].deviceId : undefined);
+    state.scanState = 'live';
+    renderScanOverlay();
+    zxingReader.decodeFromVideoDevice(deviceId, 'scan-video', function (result, err) {
+      if (result) onBarcodeDetected(result.getText());
+    });
+  } catch (e) {
+    state.scanState = 'denied';
+    renderScanOverlay();
+  }
+}
+
+function stopScanner() {
+  if (zxingReader) {
+    try { zxingReader.reset(); } catch (e) {}
+    zxingReader = null;
+  }
+  if (zxingStream) {
+    zxingStream.getTracks().forEach(function (t) { t.stop(); });
+    zxingStream = null;
+  }
+}
+
+function onBarcodeDetected(barcode) {
+  if (state.view === 'penerimaan-scan') {
+    stopScanner();
+    tutupScan();
+    cariProdukPenerimaan(barcode);
+    return;
+  }
+  if (!state.sesi) return;
+  if (state.view === 'selisih-list') {
+    const item = state.sesi.Items.filter(function (i) {
+      return String(i.Barcode || '') === String(barcode) && hitungSelisih(i) !== 0;
+    })[0];
+    if (item) {
+      stopScanner();
+      tutupScan();
+      bukaEditSelisih(item);
+    } else {
+      state.scanState = 'notfound';
+      state.scanNotFoundBarcode = barcode;
+      stopScanner();
+      renderScanOverlay();
+    }
+    return;
+  }
+  const item = state.sesi.Items.filter(function (i) { return String(i.Barcode || '') === String(barcode); })[0];
+  if (item) {
+    stopScanner();
+    tutupScan();
+    bukaInputStok(item);
+  } else {
+    // Barcode kebaca tapi bukan produk di sesi ini - kamera dihentikan dulu (supaya
+    // tidak spam deteksi barcode yang sama berulang-ulang tiap frame), tampilkan pesan,
+    // Petugas pilih "Scan Lagi" (nyalakan ulang) atau "Tutup" (balik cari manual).
+    state.scanState = 'notfound';
+    state.scanNotFoundBarcode = barcode;
+    stopScanner();
+    renderScanOverlay();
+  }
+}
+
+// ---- API helper --------------------------------------------------------
+async function api(action, params) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(function () { controller.abort(); }, 25000); // 25 detik batas tunggu
+  let res;
+  try {
+    res = await fetch(BACKEND_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // hindari CORS preflight OPTIONS (GAS doPost tidak menangani preflight)
+      body: JSON.stringify({ action: action, params: params || {} }),
+      signal: controller.signal
+    });
+  } catch (e) {
+    if (e.name === 'AbortError') {
+      throw new Error('Server tidak merespon (timeout 25 detik). Coba lagi, atau cek status server.');
+    }
+    throw new Error('Gagal terhubung ke server. Cek koneksi internet kamu.');
+  } finally {
+    clearTimeout(timeoutId);
+  }
+  let json;
+  try {
+    json = await res.json();
+  } catch (e) {
+    throw new Error('Server mengembalikan respon tidak valid (bukan JSON). Cek Executions di Apps Script.');
+  }
+  if (!json.success) throw new Error(json.message || 'Terjadi kesalahan pada server.');
+  return json.data;
+}
+
+function esc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+  });
+}
+function fmtTanggal(d) {
+  if (!d) return '-';
+  const dt = new Date(d);
+  const bulan = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+  return dt.getDate() + ' ' + bulan[dt.getMonth()] + ' ' + dt.getFullYear();
+}
+function fmtWaktu(d) {
+  if (!d) return '-';
+  const dt = new Date(d);
+  return fmtTanggal(d) + ' ' + String(dt.getHours()).padStart(2, '0') + ':' + String(dt.getMinutes()).padStart(2, '0');
+}
+function statusBadge(statusLabel) {
+  const map = {
+    MENUNGGU_PETUGAS: { text: 'Menunggu Petugas', cls: 'warning' },
+    PROSES_OPNAME: { text: 'Proses Opname', cls: 'info' },
+    MENUNGGU_REVIEW: { text: 'Selesai (Menunggu Review)', cls: 'success' },
+    SUDAH_FINAL: { text: 'Sudah Final (Disesuaikan)', cls: 'neutral' }
+  };
+  return map[statusLabel] || { text: statusLabel, cls: 'neutral' };
+}
+
+// ---- Pengantaran Online: helpers & actions --------------------------------
+function pengUang(n) { return 'Rp' + Number(n || 0).toLocaleString('id-ID'); }
+function pengBadge(status) {
+  const map = {
+    DIPROSES: { text: 'DIPROSES', cls: 'warning' },
+    DIANTAR: { text: 'DIANTAR', cls: 'info' },
+    SELESAI: { text: 'SELESAI', cls: 'success' }
+  };
+  return map[status] || { text: status, cls: 'neutral' };
+}
+function pengCari(id) {
+  return state.pengantaranList.filter(function (p) { return p.Id === id; })[0] || null;
+}
+// Badge status bayar buat kurir - LUNAS (ijo), BELUM_LUNAS/COD (merah, wajib tagih),
+// default BELUM_DIKETAHUI (abu2) kalau backend belum kirim kolom StatusBayar-nya.
+function pengBadgeBayar(statusBayar) {
+  const map = {
+    LUNAS: { text: '✓ LUNAS', cls: 'success' },
+    BELUM_LUNAS: { text: '✗ BELUM BAYAR - COD', cls: 'danger' },
+    COD: { text: '✗ BELUM BAYAR - COD', cls: 'danger' }
+  };
+  return map[statusBayar] || { text: '? Cek Status Bayar', cls: 'neutral' };
+}
+
+// Ubah 1 baris respons server (Kode/Items/FotoUrl/dst - lihat PesananOnlineModel.js)
+// jadi bentuk yang dipakai render view di bawah (Id/Waktu/Produk/Foto - field lama,
+// TIDAK diubah supaya diff minimal). `_rowId` (Id UUID asli) disimpan terpisah, dipakai
+// manggil apiMulaiPengantaran/apiSelesaikanPengantaranOnline - p.Id yang tampil ke user
+// & jadi kunci pengCari() sekarang = Kode (mis. "ONL-20260806-ab12"), BUKAN Id server.
+function pengMapDariServer(row) {
+  return {
+    Id: row.Kode,
+    _rowId: row.Id,
+    Waktu: fmtWaktu(row.CreatedAt),
+    Status: row.Status,
+    Pelanggan: row.Pelanggan,
+    Kontak: row.Kontak,
+    Alamat: row.Alamat,
+    Catatan: row.Catatan,
+    Produk: (row.Items || []).map(function (it) { return { n: it.nama, qty: it.qty, harga: it.harga }; }),
+    Total: row.Total,
+    Foto: row.FotoUrl || null,
+    CatatanSelesai: row.CatatanSelesai || '',
+    WaktuSelesai: row.WaktuSelesai ? fmtWaktu(row.WaktuSelesai) : '',
+    PetugasNama: row.PetugasNama || '',
+    // Status bayar - field baru dari server (row.StatusBayar), belum ada di backend lama
+    // makanya di-fallback 'BELUM_DIKETAHUI' kalau kolom belum dikirim (lihat pengBadgeBayar).
+    StatusBayar: row.StatusBayar || 'BELUM_DIKETAHUI'
+  };
+}
+
+// Pola sama persis bukaPenerimaanList: pindah layar pakai cache dulu (kalau ada), refresh
+// diam-diam di belakang - tidak nunggu network buat buka menu.
+function bukaPengantaranList() {
+  state.pengantaranFilter = 'DIPROSES';
+  goto('pengantaran');
+  refreshPengantaranListSilent();
+}
+function refreshPengantaranListSilent() {
+  const viewSaatDipanggil = state.view;
+  api('apiListPengantaranUntukPetugas', { token: state.token }).then(function (data) {
+    state.pengantaranList = (data || []).map(pengMapDariServer);
+    state.pengantaranError = '';
+    if (state.view === viewSaatDipanggil || state.view === 'home') render();
+  }).catch(function (e) {
+    // BEDA dari sebelumnya (diem total) - list cache lama TETAP dipakai (tidak dihapus),
+    // tapi kalau memang lagi kosong (cache lama pun kosong), tandai pengantaranError
+    // supaya layar bisa bedain "beneran belum ada pesanan" vs "gagal ambil data" (mis.
+    // Web App belum di-deploy ulang setelah update kode - lihat catatan Controller.js).
+    state.pengantaranError = (e && e.message) || 'Gagal memuat data pengantaran.';
+    if (state.view === viewSaatDipanggil || state.view === 'home') render();
+  });
+}
+
+// BARU - polling ringan Pengantaran Online: sebelumnya list HANYA diambil sekali saat
+// initApp()/buka menu, jadi kalau kurir lagi diam di layar Home/Pengantaran pas kasir
+// proses pesanan baru di POS Desktop, gak ada yang nongol sampai kurir keluar-masuk menu
+// manual. Interval ini jalan terus di background (dipanggil sekali di bawah initApp()),
+// TAPI cuma benar-benar nembak API kalau kondisinya relevan (sudah login DAN sedang di
+// layar yang nampilin data Pengantaran) - supaya tidak boros baterai/kuota pas kurir lagi
+// buka layar lain (mis. Stock Opname).
+const PENGANTARAN_POLL_MS = 20000;
+function mulaiPollingPengantaran() {
+  setInterval(function () {
+    const viewRelevan = ['home', 'pengantaran', 'pengantaran-detail'];
+    if (!state.token || viewRelevan.indexOf(state.view) === -1) return;
+    refreshPengantaranListSilent();
+  }, PENGANTARAN_POLL_MS);
+}
+
+function bukaPengantaranDetail(id) {
+  state.pengantaranAktif = pengCari(id);
+  goto('pengantaran-detail');
+}
+
+// Status DIPROSES -> DIANTAR sungguhan di server (apiMulaiPengantaran) - begitu berhasil,
+// POS Desktop yang lagi buka panel Ringkasan langsung lihat status DIANTAR di polling
+// berikutnya (lihat POSPage_startPollingPesananOnline di POS.html).
+function mulaiPengantaran() {
+  guarded(async function () {
+    const p = state.pengantaranAktif;
+    const updated = await api('apiMulaiPengantaran', { token: state.token, id: p._rowId });
+    state.pengantaranAktif = pengMapDariServer(updated);
+    state.pengantaranFoto = state.pengantaranAktif.Foto;
+    showToast('Pengantaran dimulai untuk ' + p.Id + '.');
+    goto('pengantaran-foto');
+  });
+}
+
+function pilihFotoPengantaran(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function (e) {
+    state.pengantaranFoto = e.target.result;
+    render();
+  };
+  reader.readAsDataURL(file);
+}
+
+function lanjutSelesaikanPengantaran() {
+  if (!state.pengantaranFoto) { state.error = 'Ambil foto bukti pengantaran dulu.'; render(); return; }
+  state.error = '';
+  state.pengantaranCatatan = '';
+  goto('pengantaran-selesai');
+}
+
+// Status DIANTAR -> SELESAI sungguhan di server (apiSelesaikanPengantaranOnline) - foto
+// (data URL base64 dari kamera/galeri HP) diupload ke Drive di sisi server, URL-nya
+// disimpan ke kolom FotoUrl. Titik inilah yang bikin POS Desktop lihat status Selesai +
+// detail (foto/catatan/waktu) tanpa langkah manual apapun di sisi kasir.
+function selesaikanPengantaran() {
+  guarded(async function () {
+    const p = state.pengantaranAktif;
+    const catatan = document.getElementById('in-catatan-selesai')
+      ? document.getElementById('in-catatan-selesai').value.trim()
+      : state.pengantaranCatatan;
+    const updated = await api('apiSelesaikanPengantaranOnline', {
+      token: state.token, id: p._rowId, fotoBase64: state.pengantaranFoto, catatan: catatan
+    });
+    const mapped = pengMapDariServer(updated);
+    // Sinkron balik ke pengantaranList lokal (bukan cuma pengantaranAktif) supaya tab
+    // SELESAI di layar daftar langsung benar tanpa nunggu refresh berikutnya.
+    const idx = state.pengantaranList.findIndex(function (x) { return x.Id === mapped.Id; });
+    if (idx !== -1) state.pengantaranList[idx] = mapped; else state.pengantaranList.push(mapped);
+    state.pengantaranAktif = mapped;
+    showToast('Pesanan ' + mapped.Id + ' selesai diantar ✓');
+    state.pengantaranFilter = 'SELESAI';
+    goto('pengantaran');
+  });
+}
+
+// Indikator Pengeditan (badge "Diedit X/2 Kali") - MAX_REVISI ikut backend existing
+// (STOCK_OPNAME_CONFIG.MAX_REVISI = 2, sudah locked §4.15/§4.21, BUKAN 3 seperti di
+// gambar referensi awal - dikonfirmasi PO tetap pakai batas lama). Hanya relevan buat
+// sesi yang sudah pernah "Selesai" (MENUNGGU_REVIEW/SUDAH_FINAL) - sebelum itu EditCount
+// selalu 0, badge tidak ditampilkan (belum ada apa-apa buat ditandai).
+const STOCK_OPNAME_MAX_REVISI = 2;
+function editBadgeInfo(editCount) {
+  const n = Number(editCount) || 0;
+  if (n <= 0) return { text: 'Diedit 0/' + STOCK_OPNAME_MAX_REVISI + ' Kali', cls: 'success', sub: 'Belum ada pengeditan' };
+  if (n >= STOCK_OPNAME_MAX_REVISI) return { text: 'Diedit ' + n + '/' + STOCK_OPNAME_MAX_REVISI + ' Kali', cls: 'danger', sub: 'Harus Adjustment' };
+  return { text: 'Diedit ' + n + '/' + STOCK_OPNAME_MAX_REVISI + ' Kali', cls: 'warning', sub: 'Masih bisa edit ' + (STOCK_OPNAME_MAX_REVISI - n) + 'x lagi' };
+}
+
+// ---- Selisih helper (Review & Edit Selisih - Petugas Mobile) --------------
+// Selisih dihitung client-side dari StokFisik - StokSistem (bukan field
+// terpisah dari server) - konsisten sama cara badge selisih di gambar Admin.
+function hitungSelisih(item) { return Number(item.StokFisik) - Number(item.StokSistem); }
+
+// Helper aman buat nampilin RakDipilih - backend kadang balikin array, kadang
+// string (comma-separated) tergantung endpoint. Jangan asumsi array, biar
+// gak lempar "X.join is not a function" dan bikin render macet/spinner nyangkut.
+function fmtRak(r) {
+  if (Array.isArray(r)) return r.join(', ');
+  return r == null || r === '' ? '-' : String(r);
+}
+
+// EditCount di sini PER PRODUK (RiwayatEdit per item dari server), beda level
+// sama editBadgeInfo(s.EditCount) yang PER SESI di atas - lihat catatan
+// keputusan di PROJECT_STATE.md. Cap angka tetap ikut STOCK_OPNAME_MAX_REVISI
+// (2) punya existing, BUKAN 3 seperti label di gambar referensi awal.
+function selisihEditBadge(item) {
+  const n = (item.RiwayatEdit || []).length;
+  if (n <= 0) return { text: 'Diedit 0/' + STOCK_OPNAME_MAX_REVISI + ' Kali', cls: 'success', sub: 'Belum ada pengeditan' };
+  if (n >= STOCK_OPNAME_MAX_REVISI) return { text: 'Diedit ' + n + '/' + STOCK_OPNAME_MAX_REVISI + ' Kali', cls: 'danger', sub: 'Harus Adjustment (hubungi Admin)' };
+  return { text: 'Diedit ' + n + '/' + STOCK_OPNAME_MAX_REVISI + ' Kali', cls: 'warning', sub: 'Masih bisa diedit ' + (STOCK_OPNAME_MAX_REVISI - n) + 'x lagi' };
+}
+
+async function guarded(fn) {
+  state.error = '';
+  state.loading = true; render();
+  try {
+    await fn();
+  } catch (e) {
+    state.error = e.message || 'Terjadi kesalahan.';
+  } finally {
+    state.loading = false; render();
+  }
+}
+
+// ---- Persist sesi login & halaman terakhir (localStorage) ---------------
+// Supaya app tidak balik ke halaman Login tiap kali di-refresh atau dibuka
+// ulang - token, user, dan halaman terakhir disimpan di localStorage lalu
+// dipulihkan saat app dimuat (lihat initApp()).
+const SESSION_KEY = 'soPetugasSession';
+
+function simpanSesiTerakhir() {
+  if (!state.token) return;
+  try {
+    localStorage.setItem(SESSION_KEY, JSON.stringify({
+      token: state.token,
+      user: state.user,
+      view: state.view,
+      sesiId: state.sesi ? state.sesi.Id : null,
+      listOrigin: state.listOrigin
+    }));
+  } catch (e) { /* localStorage tidak tersedia - abaikan, cukup fallback ke login */ }
+}
+
+function hapusSesiTersimpan() {
+  try { localStorage.removeItem(SESSION_KEY); } catch (e) {}
+}
+
+function bacaSesiTersimpan() {
+  try {
+    const raw = localStorage.getItem(SESSION_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch (e) { return null; }
+}
+
+// ---- Penerimaan yang disembunyikan dari tampilan (hapus lokal saja, TIDAK
+// menghapus data di server - hanya disembunyikan di HP ini). Disimpan di
+// localStorage supaya tetap hilang walau app di-refresh/dibuka ulang.
+const HIDDEN_PENERIMAAN_KEY = 'soPetugasPenerimaanHidden';
+
+function bacaPenerimaanTersembunyi() {
+  try {
+    const raw = localStorage.getItem(HIDDEN_PENERIMAAN_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch (e) { return []; }
+}
+
+function sembunyikanPenerimaan(id) {
+  try {
+    const hidden = bacaPenerimaanTersembunyi();
+    if (hidden.indexOf(String(id)) === -1) hidden.push(String(id));
+    localStorage.setItem(HIDDEN_PENERIMAAN_KEY, JSON.stringify(hidden));
+  } catch (e) { /* localStorage tidak tersedia - abaikan */ }
+}
+
+function goto(view) {
+  // Jaring pengaman: kalau overlay scan masih terbuka saat navigasi lain terjadi,
+  // pastikan kamera dimatikan (tidak boleh ada stream kamera nyala di background).
+  const scanEl = document.getElementById('scan-shell');
+  if (scanEl) { stopScanner(); scanEl.remove(); }
+  state.view = view; state.error = ''; render();
+  simpanSesiTerakhir();
+}
+
+// ---- Penerimaan Barang: actions -------------------------------------------
+// Pola sama persis refreshSesiListSilent: pindah layar pakai cache dulu (kalau
+// ada), refresh diam-diam di belakang, biar gak nunggu network tiap buka menu.
+function bukaPenerimaanList() {
+  goto('penerimaan');
+  refreshPenerimaanListSilent();
+}
+function refreshPenerimaanListSilent() {
+  const viewSaatDipanggil = state.view;
+  api('apiListPenerimaanBarang', { token: state.token }).then(function (data) {
+    const hidden = bacaPenerimaanTersembunyi();
+    state.penerimaanList = (data || []).filter(function (p) { return hidden.indexOf(String(p.Id)) === -1; });
+    if (state.view === viewSaatDipanggil) render();
+  }).catch(function () { /* diam - list cache lama tetap dipakai */ });
+}
+
+function mulaiPenerimaanBaru() {
+  const supplier = document.getElementById('in-p-supplier').value.trim();
+  const noNota = document.getElementById('in-p-nota').value.trim();
+  const tanggal = document.getElementById('in-p-tanggal').value;
+  const catatan = document.getElementById('in-p-catatan').value.trim();
+  if (!tanggal) { state.error = 'Tanggal wajib diisi.'; render(); return; }
+  guarded(async function () {
+    const header = await api('apiBuatPenerimaanBarang', {
+      token: state.token, supplier: supplier, noNota: noNota, tanggal: tanggal, catatan: catatan
+    });
+    state.penerimaan = Object.assign({ Items: [] }, header);
+    goto('penerimaan-scan');
+  });
+}
+
+function bukaPenerimaanDraft(id) {
+  guarded(async function () {
+    const data = await api('apiGetPenerimaanDetail', { token: state.token, penerimaanId: id });
+    state.penerimaan = data;
+    goto('penerimaan-scan');
+  });
+}
+
+// Download SEMUA produk (barcode -> data produk) sekali, simpan di memori (state.produkCache).
+// Setelah ini, scan barcode saat Penerimaan Barang tidak perlu tunggu network lagi -
+// tinggal cek ke cache lokal, jadi jauh lebih cepat (langsung ke layar Qty tanpa delay).
+function sinkronKatalogProduk() {
+  guarded(async function () {
+    const list = await api('apiListProdukUntukPenerimaan', { token: state.token });
+    const map = {};
+    (list || []).forEach(function (p) { if (p.Barcode) map[p.Barcode] = p; });
+    state.produkCache = map;
+    state.produkCacheAt = new Date();
+    state.produkCacheCount = (list || []).length;
+    showToast('Katalog tersinkron: ' + state.produkCacheCount + ' produk.');
+  });
+}
+
+// Dipanggil begitu barcode kebaca kamera saat di layar scan Penerimaan.
+function cariProdukPenerimaan(barcode) {
+  // Sudah pernah Sinkron Katalog -> cek ke cache lokal dulu, TANPA request ke server.
+  // Instan: kalau ketemu langsung ke layar Qty, kalau tidak ketemu langsung dianggap
+  // produk baru (karena katalog sudah lengkap, tidak perlu double-check ke server lagi).
+  if (state.produkCache) {
+    const produk = state.produkCache[barcode];
+    if (produk) { bukaQtyPenerimaan(produk); return; }
+    state.barcodeBaru = barcode;
+    goto('penerimaan-produk-baru');
+    return;
+  }
+  // Belum pernah Sinkron Katalog - fallback ke cara lama (cek ke server tiap scan).
+  guarded(async function () {
+    const produk = await api('apiCariProdukBarcode', { token: state.token, barcode: barcode });
+    if (produk) {
+      bukaQtyPenerimaan(produk);
+    } else {
+      state.barcodeBaru = barcode;
+      goto('penerimaan-produk-baru');
+    }
+  });
+}
+
+function qtyProdukSebelumnya(produkId) {
+  const item = (state.penerimaan.Items || []).filter(function (i) { return String(i.ProdukId) === String(produkId); })[0];
+  return item ? item.Qty : 0;
+}
+
+function bukaQtyPenerimaan(produk) {
+  state.produkPenerimaanAktif = produk;
+  state.qtyPenerimaanInput = qtyProdukSebelumnya(produk.ProdukId) || 1;
+  goto('penerimaan-qty');
+}
+
+function simpanQtyPenerimaan() {
+  guarded(async function () {
+    const produk = state.produkPenerimaanAktif;
+    const items = await api('apiSimpanItemPenerimaan', {
+      token: state.token, penerimaanId: state.penerimaan.Id, produkId: produk.ProdukId, qty: state.qtyPenerimaanInput
+    });
+    state.penerimaan.Items = items;
+    state.produkPenerimaanAktif = null;
+    state.toastMsg = 'Tersimpan: ' + produk.Nama + ' x' + state.qtyPenerimaanInput;
+    goto('penerimaan-scan');
+  });
+}
+
+function submitProdukBaruPenerimaan(nama, kategori, satuan, hargaBeli) {
+  guarded(async function () {
+    const produk = await api('apiBuatProdukBaru', {
+      token: state.token, barcode: state.barcodeBaru, nama: nama, kategori: kategori, satuan: satuan, hargaBeli: hargaBeli, stokAwal: 0
+    });
+    // Masukkan juga ke cache lokal (kalau sudah pernah Sinkron Katalog) supaya kalau
+    // barcode yang sama kescan lagi di sesi ini, langsung ketemu tanpa ke server.
+    if (state.produkCache && produk && produk.Barcode) state.produkCache[produk.Barcode] = produk;
+    state.barcodeBaru = '';
+    bukaQtyPenerimaan(produk);
+  });
+}
+
+function selesaikanPenerimaan() {
+  guarded(async function () {
+    const updated = await api('apiSelesaikanPenerimaanBarang', { token: state.token, penerimaanId: state.penerimaan.Id });
+    state.penerimaan = Object.assign({}, state.penerimaan, updated);
+    goto('penerimaan-selesai');
+  });
+}
+
+// Hapus penerimaan barang berstatus Selesai dari TAMPILAN saja (tombol Hapus
+// di kartu). TIDAK memanggil server / TIDAK menghapus data apapun di backend -
+// hanya disembunyikan dari daftar di HP ini (disimpan di localStorage supaya
+// tetap hilang meski app dibuka ulang atau di-refresh).
+function hapusPenerimaan(id) {
+  const p = (state.penerimaanList || []).filter(function (x) { return String(x.Id) === String(id); })[0];
+  const nama = p ? p.NomorPenerimaan : 'penerimaan ini';
+  if (!window.confirm('Sembunyikan ' + nama + ' dari daftar di HP ini? (data di server tidak terhapus)')) return;
+  sembunyikanPenerimaan(id);
+  state.penerimaanList = state.penerimaanList.filter(function (x) { return String(x.Id) !== String(id); });
+  showToast('Penerimaan ' + nama + ' disembunyikan dari daftar.');
+  render();
+}
+
+// ---- Actions -------------------------------------------------------------
+function doLogin(username, password) {
+  guarded(async function () {
+    const data = await api('apiLogin', { username: username, password: password });
+    state.token = data.token;
+    state.user = data.user;
+    await refreshSesiList();
+    goto('home');
+  });
+}
+
+async function refreshSesiList() {
+  state.sesiList = await api('apiListStockOpnameUntukPetugas', { token: state.token });
+}
+
+// PERBAIKAN: dipakai navigasi Home->List/back - list SUDAH ke-load pas login (dan tiap
+// selesai aksi lain), jadi gak perlu nunggu network lagi sebelum pindah layar (itu penyebab
+// klik "Mulai SO" kerasa lama). Pindah layar duluan pake data cache, baru refresh diam-diam
+// di belakang - kalau user masih di view yang sama pas hasilnya balik, baru di-render ulang.
+function refreshSesiListSilent() {
+  const viewSaatDipanggil = state.view;
+  api('apiListStockOpnameUntukPetugas', { token: state.token }).then(function (data) {
+    state.sesiList = data;
+    if (state.view === viewSaatDipanggil) { render(); }
+  }).catch(function () { /* diam - list cache lama tetap dipakai, bukan error fatal */ });
+}
+
+// Sesi masuk menu "Mulai SO" kalau belum Selesai (masih perlu dihitung petugas).
+function sesiMasukMulai(s) {
+  return s.statusLabel !== 'MENUNGGU_REVIEW' && s.statusLabel !== 'SUDAH_FINAL';
+}
+// Sesi masuk menu "Edit SO" kalau sudah Selesai (menunggu review / sudah final) -
+// yaitu tahap cek & koreksi selisih, bukan hitung stok fisik lagi.
+function sesiMasukEdit(s) {
+  return s.statusLabel === 'MENUNGGU_REVIEW' || s.statusLabel === 'SUDAH_FINAL';
+}
+
+function openSesi(id) {
+  guarded(async function () {
+    state.sesi = await api('apiGetStockOpnameDetailUntukPetugas', { token: state.token, stockOpnameId: id });
+    goto('detail');
+  });
+}
+
+function mulaiHitung() { state.filter = 'SEMUA'; state.search = ''; goto('proses'); }
+
+function lihatSelisih() { state.selisihFilter = 'SEMUA'; state.search = ''; goto('selisih-list'); }
+
+function bukaEditSelisih(item) {
+  state.selisihItem = item;
+  state.stokKoreksiInput = Number(item.StokFisik);
+  state.catatanKoreksiInput = '';
+  goto('selisih-edit');
+}
+
+function sinkronSekarang() {
+  guarded(async function () {
+    state.sesi = await api('apiGetStockOpnameDetailUntukPetugas', { token: state.token, stockOpnameId: state.sesi.Id });
+    state.lastSync = new Date();
+    showToast('Sinkron berhasil.');
+  });
+}
+
+function simpanKoreksiSelisih() {
+  guarded(async function () {
+    const updated = await api('apiEditSelisihPetugas', {
+      token: state.token,
+      stockOpnameId: state.sesi.Id,
+      produkId: state.selisihItem.ProdukId,
+      stokFisikBaru: state.stokKoreksiInput,
+      catatan: state.catatanKoreksiInput
+    });
+    const idx = state.sesi.Items.findIndex(function (i) { return String(i.ProdukId) === String(updated.ProdukId); });
+    if (idx !== -1) state.sesi.Items[idx] = updated;
+    state.selisihItem = updated;
+    goto('selisih-list');
+    const selBaru = Number(updated.StokFisik) - Number(updated.StokSistem);
+    showToast('Tersimpan. Sistem -, Selisih ' + (selBaru > 0 ? '+' : '') + selBaru + '.');
+  });
+}
+
+function showToast(msg) {
+  state.toastMsg = msg;
+  render();
+  clearTimeout(showToast._t);
+  showToast._t = setTimeout(function () { state.toastMsg = ''; render(); }, 2400);
+}
+
+function bukaInputStok(item) {
+  state.activeItem = item;
+  state.stokFisikInput = 0;
+  state.catatanInput = item.CatatanPetugas || '';
+  state.focusStokFisik = true;
+  goto('input');
+}
+
+function simpanStokFisik() {
+  const item = state.activeItem;
+  const qty = state.stokFisikInput;
+  const catatan = state.catatanInput;
+
+  // OPTIMASI UTAMA: dulu nunggu balesan server (backend GAS, bisa 1-3 detik) BARU pindah
+  // layar - ini penyebab utama alur kerasa "lelet". Sekarang: update state lokal INSTAN,
+  // langsung lompat ke produk berikutnya, simpan ke server jalan di BACKGROUND tanpa
+  // nge-block tampilan sama sekali.
+  item.Dihitung = true;
+  item.StokFisik = qty;
+  item.CatatanPetugas = catatan;
+  recomputeProgress();
+
+  const next = state.sesi.Items.filter(function (d) { return d.Dihitung !== true; })[0];
+  if (next) {
+    state.toastMsg = 'Tersimpan. Lanjut produk berikutnya.';
+    bukaInputStok(next);
+  } else {
+    state.toastMsg = 'Tersimpan. Semua produk sudah dihitung ✓';
+    goto('proses');
+  }
+
+  api('apiInputStokFisikPetugas', {
+    token: state.token,
+    stockOpnameId: state.sesi.Id,
+    produkId: item.ProdukId,
+    stokFisik: qty,
+    catatan: catatan
+  }).then(function (items) {
+    state.sesi.Items = items; // sinkron ulang dari server begitu selesai
+    recomputeProgress();
+    render();
+  }).catch(function (e) {
+    // Gagal sync ke server - balikin status jadi belum dihitung biar KEDATA, jangan diam-diam
+    // ilang. Petugas dikasih tau via toast, tapi alur kerja tetap gak ke-block.
+    item.Dihitung = false;
+    recomputeProgress();
+    state.toastMsg = 'Gagal sinkron "' + item.Nama + '": ' + e.message + '. Coba input ulang.';
+    render();
+  });
+}
+
+function recomputeProgress() {
+  const items = state.sesi.Items;
+  const sudah = items.filter(function (d) { return d.Dihitung === true; }).length;
+  state.sesi.totalProduk = items.length;
+  state.sesi.sudahDihitung = sudah;
+  state.sesi.belumDihitung = items.length - sudah;
+  state.sesi.statusLabel = sudah === items.length ? state.sesi.statusLabel : state.sesi.statusLabel;
+}
+
+function selesaikanOpname() {
+  guarded(async function () {
+    const updated = await api('apiSelesaikanOpnamePetugas', { token: state.token, stockOpnameId: state.sesi.Id });
+    // Jangan biarin field RakDipilih dari response nimpa kalau bentuknya beda
+    // (server kadang balikin string, bukan array) - pertahanin array asli.
+    if (updated && !Array.isArray(updated.RakDipilih)) delete updated.RakDipilih;
+    state.sesi = Object.assign({}, state.sesi, updated, { statusLabel: 'MENUNGGU_REVIEW' });
+    goto('selesai');
+  });
+}
+
+// ---- Views -----------------------------------------------------------
+function render() {
+  const shell = document.getElementById('shell');
+  let html = '<div class="statusbar"></div>';
+  html += VIEWS[state.view] ? VIEWS[state.view]() : '';
+  if (state.error) {
+    html = html.replace('__ERROR__', '<div class="err-text">' + esc(state.error) + '</div>');
+  } else {
+    html = html.replace('__ERROR__', '');
+  }
+  shell.innerHTML = html;
+  bindEvents();
+  if (state.toastMsg) {
+    const t = document.createElement('div');
+    t.className = 'toast';
+    t.textContent = state.toastMsg;
+    document.body.appendChild(t);
+    setTimeout(function () { if (t.parentNode) t.parentNode.removeChild(t); }, 2300);
+  }
+}
+
+const VIEWS = {
+  login: function () {
+    return '' +
+    '<div class="login-shell">' +
+      '<div class="shelf-bg">' +
+        '<div class="col l"></div><div class="col r"></div>' +
+        '<div class="post" style="left:4%;"></div><div class="post" style="left:26%;"></div>' +
+        '<div class="beam" style="top:22%;left:2%;right:74%;"></div>' +
+        '<div class="beam" style="top:48%;left:2%;right:74%;"></div>' +
+        '<div class="beam" style="top:74%;left:2%;right:74%;"></div>' +
+        '<div class="box" style="left:6%;top:24%;width:36px;height:30px;background:#C9AF87;"></div>' +
+        '<div class="box" style="left:14%;top:26%;width:30px;height:26px;background:#B99A72;"></div>' +
+        '<div class="box" style="left:7%;top:50%;width:40px;height:32px;background:#D4BC94;"></div>' +
+        '<div class="box" style="left:16%;top:76%;width:34px;height:28px;background:#C9AF87;"></div>' +
+        '<div class="post" style="right:4%;"></div><div class="post" style="right:26%;"></div>' +
+        '<div class="beam" style="top:22%;left:74%;right:2%;"></div>' +
+        '<div class="beam" style="top:48%;left:74%;right:2%;"></div>' +
+        '<div class="beam" style="top:74%;left:74%;right:2%;"></div>' +
+        '<div class="box" style="right:6%;top:24%;width:36px;height:30px;background:#B99A72;"></div>' +
+        '<div class="box" style="right:14%;top:28%;width:30px;height:26px;background:#C9AF87;"></div>' +
+        '<div class="box" style="right:7%;top:50%;width:40px;height:32px;background:#D4BC94;"></div>' +
+        '<div class="box" style="right:16%;top:76%;width:34px;height:28px;background:#B99A72;"></div>' +
+      '</div>' +
+      '<div class="login-card">' +
+        '<div class="login-icon">' +
+          '<svg viewBox="0 0 100 100" width="98" height="98">' +
+            '<polygon points="50,6 90,28 90,72 50,94 10,72 10,28" fill="none" stroke="#1A3A8F" stroke-width="4"/>' +
+            '<rect x="34" y="26" width="30" height="40" rx="3" fill="#F3F6FC" stroke="#1A3A8F" stroke-width="2.5"/>' +
+            '<rect x="42" y="22" width="14" height="7" rx="2" fill="#1A3A8F"/>' +
+            '<line x1="40" y1="38" x2="58" y2="38" stroke="#1A3A8F" stroke-width="2"/>' +
+            '<polyline points="38,46 41,49 46,43" fill="none" stroke="#22C55E" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>' +
+            '<polyline points="38,54 41,57 46,51" fill="none" stroke="#22C55E" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>' +
+            '<polyline points="38,62 41,65 46,59" fill="none" stroke="#22C55E" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>' +
+            '<rect x="52" y="56" width="16" height="16" rx="2" fill="#6E8FD9" stroke="#1A3A8F" stroke-width="1.5"/>' +
+            '<rect x="60" y="48" width="14" height="14" rx="2" fill="#8FAAE0" stroke="#1A3A8F" stroke-width="1.5"/>' +
+            '<circle cx="76" cy="66" r="12" fill="#22C55E"/>' +
+            '<polyline points="70,66 74,70 82,61" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>' +
+          '</svg>' +
+        '</div>' +
+        '<div class="login-title" style="font-size:17px;">RETAIL MANAGEMENT SYSTEM</div>' +
+        '<div class="login-subtitle">Inventory Counting System</div>' +
+        '<div class="login-divider"></div>' +
+        '<div class="login-welcome">Welcome Back</div>' +
+        '<div class="login-welcome-sub">Please log in to access the Retail Management System</div>' +
+        '<div class="field"><label>Username</label><div class="field-icon">' +
+          '<span class="ic"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.5-7 8-7s8 3 8 7"/></svg></span>' +
+          '<input type="text" id="in-username" placeholder="Enter your username" />' +
+        '</div></div>' +
+        '<div class="field"><label>Password</label><div class="pw-wrap field-icon">' +
+          '<span class="ic"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg></span>' +
+          '<input type="' + (state.showPw ? 'text' : 'password') + '" id="in-password" placeholder="Enter your password" />' +
+          '<button type="button" class="toggle" data-act="toggle-pw">' + (state.showPw ?
+            '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3l18 18"/><path d="M10.6 10.6a2 2 0 0 0 2.8 2.8"/><path d="M9.5 5.4A9.6 9.6 0 0 1 12 5c5 0 9 4 10 7-.4 1.2-1.3 2.7-2.6 4M6.6 6.6C4.4 8 2.9 9.9 2 12c1 3 5 7 10 7 1.3 0 2.5-.2 3.6-.6"/></svg>' :
+            '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>'
+          ) + '</button>' +
+        '</div></div>' +
+        '__ERROR__' +
+        '<button class="btn btn-primary btn-gradient" data-act="login" style="margin-top:8px;"' + (state.loading ? ' disabled' : '') + '>' + (state.loading ? '<span class="spinner"></span>' : 'Login') + '</button>' +
+        '<div class="login-footer">' +
+          '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#1A3A8F" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-3z"/><path d="M9 12l2 2 4-4"/></svg>' +
+          '<span>Secure access. Your data is protected.</span>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+  },
+
+  // Halaman utama: dua menu - Mulai SO (sesi yang masih perlu dihitung petugas)
+  // dan Edit SO (sesi yang sudah Selesai/Final, buat cek & edit selisih).
+  home: function () {
+    const sesiMulai = state.sesiList.filter(sesiMasukMulai);
+    const sesiEdit = state.sesiList.filter(sesiMasukEdit);
+    const pengDiproses = state.pengantaranList.filter(function (p) { return p.Status === 'DIPROSES'; });
+    return '' +
+    '<div class="topbar"><button class="ic-btn" data-act="logout">←</button>' +
+      '<div class="topbar-brand">' +
+        '<svg width="22" height="22" viewBox="0 0 100 100">' +
+          '<polygon points="50,6 90,28 90,72 50,94 10,72 10,28" fill="none" stroke="#1A3A8F" stroke-width="7"/>' +
+          '<polyline points="34,52 45,63 68,38" fill="none" stroke="#22C55E" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>' +
+        '</svg>' +
+        '<span class="name">Retail Management System</span>' +
+      '</div>' +
+      '<button class="ic-btn">☰</button></div>' +
+    '<div class="content">' +
+      '<div class="info-box"><div><b>Halo, ' + esc((state.user && state.user.FullName) || 'Petugas') + '</b>Pilih menu di bawah untuk melanjutkan.</div></div>' +
+      '<div class="card card-clickable" data-act="goto-penerimaan" style="cursor:pointer;display:flex;align-items:center;gap:14px;">' +
+        '<div class="thumb" style="width:46px;height:46px;border-radius:12px;background:var(--success-tint);display:flex;align-items:center;justify-content:center;font-size:20px;flex:0 0 auto;">📦</div>' +
+        '<div style="flex:1;"><div style="font-weight:800;font-size:15px;">Penerimaan Barang</div>' +
+        '<div style="font-size:12px;color:var(--gray-500);margin-top:2px;">Terima barang masuk dari supplier</div></div>' +
+        '<span class="badge neutral">›</span>' +
+      '</div>' +
+      '<div class="card card-clickable" data-act="goto-pengantaran" style="cursor:pointer;display:flex;align-items:center;gap:14px;">' +
+        '<div class="thumb" style="width:46px;height:46px;border-radius:12px;background:var(--info-tint);display:flex;align-items:center;justify-content:center;font-size:20px;flex:0 0 auto;">🛵</div>' +
+        '<div style="flex:1;"><div style="font-weight:800;font-size:15px;">Pengantaran Online</div>' +
+        '<div style="font-size:12px;color:var(--gray-500);margin-top:2px;">Antar pesanan online ke pelanggan</div></div>' +
+        '<span class="badge ' + (pengDiproses.length ? 'warning' : 'neutral') + '">' + pengDiproses.length + '</span>' +
+      '</div>' +
+      '<div class="card card-clickable" data-act="goto-list-mulai" style="cursor:pointer;display:flex;align-items:center;gap:14px;">' +
+        '<div class="thumb" style="width:46px;height:46px;border-radius:12px;background:var(--primary-tint);display:flex;align-items:center;justify-content:center;font-size:20px;flex:0 0 auto;">📋</div>' +
+        '<div style="flex:1;"><div style="font-weight:800;font-size:15px;">Mulai SO</div>' +
+        '<div style="font-size:12px;color:var(--gray-500);margin-top:2px;">Hitung stok fisik untuk sesi yang belum selesai</div></div>' +
+        '<span class="badge ' + (sesiMulai.length ? 'warning' : 'neutral') + '">' + sesiMulai.length + '</span>' +
+      '</div>' +
+      '<div class="card card-clickable" data-act="goto-list-edit" style="cursor:pointer;display:flex;align-items:center;gap:14px;">' +
+        '<div class="thumb" style="width:46px;height:46px;border-radius:12px;background:var(--info-tint);display:flex;align-items:center;justify-content:center;font-size:20px;flex:0 0 auto;">✏️</div>' +
+        '<div style="flex:1;"><div style="font-weight:800;font-size:15px;">Edit SO</div>' +
+        '<div style="font-size:12px;color:var(--gray-500);margin-top:2px;">Cek dan koreksi selisih sesi yang sudah selesai</div></div>' +
+        '<span class="badge ' + (sesiEdit.length ? 'info' : 'neutral') + '">' + sesiEdit.length + '</span>' +
+      '</div>' +
+    '</div>';
+  },
+
+  pengantaran: function () {
+    const tabs = ['DIPROSES', 'DIANTAR', 'SELESAI'];
+    const rows = state.pengantaranList.filter(function (p) { return p.Status === state.pengantaranFilter; });
+    const cards = rows.map(function (p) {
+      const b = pengBadge(p.Status);
+      const bBayar = pengBadgeBayar(p.StatusBayar);
+      return '<div class="card">' +
+        '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;">' +
+          '<div><div style="font-weight:800;font-size:14.5px;">' + esc(p.Id) + '</div>' +
+          '<div class="lbl" style="margin-top:2px;">' + esc(p.Waktu) + '</div></div>' +
+          '<span class="badge ' + b.cls + '">' + b.text + '</span>' +
+        '</div>' +
+        '<div class="row"><span class="lbl">Pelanggan</span><span class="val">' + esc(p.Pelanggan) + '</span></div>' +
+        '<div class="row"><span class="lbl">Alamat</span><span class="val" style="text-align:right;max-width:210px;">' + esc(p.Alamat) + '</span></div>' +
+        '<div class="row"><span class="lbl">Produk</span><span class="val">' + p.Produk.length + ' produk • ' + pengUang(p.Total) + '</span></div>' +
+        '<div class="row"><span class="lbl">Bayar</span><span class="badge ' + bBayar.cls + '" style="font-size:11px;">' + bBayar.text + '</span></div>' +
+        '<div style="margin-top:10px;">' +
+          '<button class="btn btn-primary" data-act="pilih-pengantaran" data-id="' + esc(p.Id) + '">Pilih Pesanan</button>' +
+        '</div>' +
+      '</div>';
+    }).join('');
+    return '' +
+    '<div class="topbar"><button class="ic-btn" data-act="back-to-home">←</button><h1>Pengantaran Online</h1><div style="width:34px;"></div></div>' +
+    '<div class="content">' +
+      '<div class="chip-row">' +
+        tabs.map(function (t) {
+          const n = state.pengantaranList.filter(function (p) { return p.Status === t; }).length;
+          return '<button class="chip' + (state.pengantaranFilter === t ? ' active' : '') + '" data-act="filter-pengantaran" data-f="' + t + '">' + t.charAt(0) + t.slice(1).toLowerCase() + ' (' + n + ')</button>';
+        }).join('') +
+      '</div>' +
+      (cards || (
+        (state.pengantaranError && state.pengantaranList.length === 0)
+          ? '<div class="empty-state" style="color:hsl(var(--red));">⚠ ' + esc(state.pengantaranError) +
+            '<div style="margin-top:10px;"><button class="btn btn-primary" data-act="retry-pengantaran">Coba Lagi</button></div></div>'
+          : '<div class="empty-state">Belum ada pesanan ' + state.pengantaranFilter.toLowerCase() + '.</div>'
+      )) +
+    '</div>';
+  },
+
+  'pengantaran-detail': function () {
+    const p = state.pengantaranAktif;
+    const b = pengBadge(p.Status);
+    const bBayar = pengBadgeBayar(p.StatusBayar);
+    const belumLunas = (p.StatusBayar === 'BELUM_LUNAS' || p.StatusBayar === 'COD');
+    const rowsProduk = p.Produk.map(function (i) {
+      return '<div class="row"><span class="lbl">' + esc(i.n) + ' x' + i.qty + '</span><span class="val">' + pengUang(i.qty * i.harga) + '</span></div>';
+    }).join('');
+    return '' +
+    '<div class="topbar"><button class="ic-btn" data-act="back-to-pengantaran-list">←</button><h1>Detail Pesanan</h1><div style="width:34px;"></div></div>' +
+    '<div class="content">' +
+      '<div class="card" style="border:2px solid ' + (belumLunas ? 'var(--danger)' : 'transparent') + ';">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;">' +
+          '<div style="font-weight:800;font-size:13.5px;">Status Pembayaran</div>' +
+          '<span class="badge ' + bBayar.cls + '">' + bBayar.text + '</span>' +
+        '</div>' +
+        (belumLunas ? '<div class="row" style="margin-top:8px;"><span class="lbl" style="font-weight:800;">Tagih ke pelanggan</span><span class="val" style="font-weight:800;color:#B91C1C;">' + pengUang(p.Total) + '</span></div>' : '') +
+      '</div>' +
+      '<div class="card">' +
+        '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;">' +
+          '<div style="font-weight:800;font-size:15.5px;">' + esc(p.Id) + '</div>' +
+          '<span class="badge ' + b.cls + '">' + b.text + '</span>' +
+        '</div>' +
+        '<div class="row"><span class="lbl">Pelanggan</span><span class="val">' + esc(p.Pelanggan) + '</span></div>' +
+        '<div class="row"><span class="lbl">Kontak</span><span class="val">' + esc(p.Kontak) + '</span></div>' +
+        '<div class="row"><span class="lbl">Alamat</span><span class="val" style="text-align:right;max-width:210px;">' + esc(p.Alamat) + '</span></div>' +
+        (p.Catatan ? '<div class="row"><span class="lbl">Catatan</span><span class="val" style="text-align:right;max-width:210px;">' + esc(p.Catatan) + '</span></div>' : '') +
+      '</div>' +
+      '<div class="card">' +
+        '<div style="font-weight:800;font-size:13.5px;margin-bottom:8px;">Detail Produk (' + p.Produk.length + ')</div>' +
+        rowsProduk +
+        '<div class="row" style="border-top:1px solid var(--border);margin-top:6px;padding-top:10px;"><span class="lbl" style="font-weight:800;color:var(--gray-900);">Total Pesanan</span><span class="val" style="font-size:15px;">' + pengUang(p.Total) + '</span></div>' +
+      '</div>' +
+      (p.Status === 'SELESAI'
+        ? '<div class="card">' +
+            '<div style="font-weight:800;font-size:13.5px;margin-bottom:10px;">Bukti Pengantaran</div>' +
+            (p.Foto ? '<img src="' + esc(p.Foto) + '" style="width:100%;border-radius:14px;display:block;max-height:220px;object-fit:cover;margin-bottom:10px;" />' : '') +
+            '<div class="row"><span class="lbl">Selesai oleh</span><span class="val">' + esc(p.PetugasNama || '-') + '</span></div>' +
+            '<div class="row"><span class="lbl">Waktu Selesai</span><span class="val">' + esc(p.WaktuSelesai || '-') + '</span></div>' +
+            (p.CatatanSelesai ? '<div class="row"><span class="lbl">Catatan</span><span class="val" style="text-align:right;max-width:210px;">' + esc(p.CatatanSelesai) + '</span></div>' : '') +
+          '</div>'
+        : '') +
+      '__ERROR__' +
+    '</div>' +
+    (p.Status === 'SELESAI' ? '' :
+    '<div class="footer-fixed">' +
+      (p.Status === 'DIPROSES'
+        ? '<button class="btn btn-primary" data-act="mulai-pengantaran">Mulai Pengantaran</button>'
+        : '<button class="btn btn-outline" data-act="lanjut-pengantaran-foto">Lanjutkan Pengantaran</button>') +
+    '</div>');
+  },
+
+  'pengantaran-foto': function () {
+    const p = state.pengantaranAktif;
+    return '' +
+    '<div class="topbar"><button class="ic-btn" data-act="back-to-pengantaran-detail">←</button><h1>Bukti Pengantaran</h1><span class="badge info">' + esc(p.Status) + '</span></div>' +
+    '<div class="content">' +
+      '<div class="card">' +
+        '<div style="font-weight:800;font-size:13.5px;margin-bottom:10px;">Ambil foto bukti pengantaran *</div>' +
+        (state.pengantaranFoto
+          ? '<div style="position:relative;border-radius:14px;overflow:hidden;margin-bottom:12px;">' +
+              '<img src="' + state.pengantaranFoto + '" style="width:100%;display:block;max-height:260px;object-fit:cover;" />' +
+              '<div style="position:absolute;top:8px;right:8px;width:26px;height:26px;border-radius:50%;background:var(--success);color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;">✓</div>' +
+            '</div>'
+          : '<div class="empty-state" style="padding:32px 12px;">📦<br/>Belum ada foto</div>') +
+        '<input type="file" id="in-foto-kamera" accept="image/*" capture="environment" style="display:none;" />' +
+        '<input type="file" id="in-foto-galeri" accept="image/*" style="display:none;" />' +
+        '<button class="btn btn-primary" data-act="ambil-foto" style="margin-bottom:8px;">📷 Ambil Foto</button>' +
+        '<button class="btn btn-outline" data-act="pilih-galeri">🖼 Pilih dari Galeri</button>' +
+      '</div>' +
+      '<div class="info-box"><div><b>Pastikan barang terlihat jelas</b>Foto menunjukkan barang di lokasi tujuan.</div></div>' +
+      '__ERROR__' +
+    '</div>' +
+    '<div class="footer-fixed">' +
+      '<button class="btn btn-primary" data-act="lanjut-selesaikan-pengantaran"' + (!state.pengantaranFoto ? ' disabled' : '') + '>Lanjutkan</button>' +
+    '</div>';
+  },
+
+  'pengantaran-selesai': function () {
+    const p = state.pengantaranAktif;
+    return '' +
+    '<div class="topbar"><button class="ic-btn" data-act="back-to-pengantaran-foto">←</button><h1>Selesaikan Pesanan</h1><span class="badge info">' + esc(p.Status) + '</span></div>' +
+    '<div class="content">' +
+      '<div class="card" style="text-align:center;">' +
+        '<div style="font-weight:800;font-size:13.5px;margin-bottom:10px;text-align:left;">Foto Bukti</div>' +
+        '<div style="position:relative;border-radius:14px;overflow:hidden;">' +
+          '<img src="' + state.pengantaranFoto + '" style="width:100%;display:block;max-height:220px;object-fit:cover;" />' +
+        '</div>' +
+        '<button class="btn btn-outline" data-act="ubah-foto" style="margin-top:10px;width:auto;padding:8px 14px;font-size:13px;">Ubah Foto</button>' +
+      '</div>' +
+      '<div class="field"><label>Catatan (Opsional)</label>' +
+        '<textarea id="in-catatan-selesai" rows="2" placeholder="Contoh: Pesanan diterima oleh Ibu di rumah.">' + esc(state.pengantaranCatatan) + '</textarea></div>' +
+    '</div>' +
+    '<div class="footer-fixed">' +
+      '<button class="btn btn-primary" data-act="selesaikan-pengantaran"' + (state.loading ? ' disabled' : '') + '>✓ Selesaikan Pesanan</button>' +
+    '</div>';
+  },
+
+  penerimaan: function () {
+    const filtered = state.penerimaanList.filter(function (p) {
+      return state.penerimaanFilter === 'SEMUA' ? true : p.Status === state.penerimaanFilter;
+    });
+    const rows = filtered.map(function (p) {
+      const isDraft = p.Status === 'Draft';
+      return '<div class="card' + (isDraft ? ' card-clickable' : '') + '"' +
+        (isDraft ? ' data-act="buka-penerimaan-draft" data-id="' + p.Id + '" style="cursor:pointer;"' : '') + '>' +
+        '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;">' +
+          '<div style="font-weight:800;font-size:14.5px;">' + esc(p.NomorPenerimaan) + '</div>' +
+          '<span class="badge ' + (isDraft ? 'warning' : 'success') + '">' + esc(p.Status) + '</span>' +
+        '</div>' +
+        '<div class="row"><span class="lbl">Supplier</span><span class="val">' + esc(p.Supplier || '(Tanpa Supplier)') + '</span></div>' +
+        '<div class="row"><span class="lbl">Tanggal</span><span class="val">' + fmtTanggal(p.Tanggal) + '</span></div>' +
+        '<div class="row"><span class="lbl">Qty / Nilai</span><span class="val">' + (p.TotalQty || 0) + ' • Rp' + Number(p.TotalNilai || 0).toLocaleString('id-ID') + '</span></div>' +
+        (!isDraft ?
+          '<div style="margin-top:10px;text-align:right;">' +
+            '<button class="btn btn-danger-outline" style="width:auto;padding:8px 14px;font-size:13px;" data-act="hapus-penerimaan" data-id="' + p.Id + '"' + (state.loading ? ' disabled' : '') + '>Hapus</button>' +
+          '</div>' : '') +
+      '</div>';
+    }).join('');
+    return '' +
+    '<div class="topbar"><button class="ic-btn" data-act="back-to-home">←</button><h1>Penerimaan Barang</h1>' +
+      '<button class="ic-btn" data-act="sinkron-katalog-produk" style="margin-right:6px;"' + (state.loading ? ' disabled' : '') + '>☁</button>' +
+      '<button class="ic-btn" data-act="goto-penerimaan-buat">+</button></div>' +
+    '<div class="content">' +
+      '<div class="card" style="display:flex;align-items:center;gap:10px;">' +
+        '<div style="flex:1;">' +
+          '<div style="font-weight:800;font-size:13.5px;">Katalog Produk (untuk Scan)</div>' +
+          '<div class="lbl" style="margin-top:2px;">' +
+            (state.produkCache
+              ? state.produkCacheCount + ' produk • tersinkron ' + fmtWaktu(state.produkCacheAt)
+              : 'Belum disinkron - scan barcode masih cek ke server tiap kali') +
+          '</div>' +
+        '</div>' +
+        '<button class="btn btn-primary" style="width:auto;padding:9px 14px;font-size:13px;" data-act="sinkron-katalog-produk"' + (state.loading ? ' disabled' : '') + '>' + (state.produkCache ? 'Sinkron Ulang' : 'Sinkron') + '</button>' +
+      '</div>' +
+      '<div class="chip-row">' +
+        ['SEMUA', 'DRAFT', 'SELESAI'].map(function (f) {
+          return '<button class="chip' + (state.penerimaanFilter === f ? ' active' : '') + '" data-act="filter-penerimaan" data-f="' + f + '">' + f.charAt(0) + f.slice(1).toLowerCase() + '</button>';
+        }).join('') +
+      '</div>' +
+      (rows || '<div class="empty-state">Belum ada penerimaan barang.</div>') +
+    '</div>';
+  },
+
+  'penerimaan-buat': function () {
+    return '' +
+    '<div class="topbar"><button class="ic-btn" data-act="back-to-penerimaan-list">←</button><h1>Buat Penerimaan</h1><div style="width:34px;"></div></div>' +
+    '<div class="content">' +
+      '<div class="field"><label>Supplier (Opsional)</label>' +
+        '<input type="text" id="in-p-supplier" placeholder="Nama supplier/agen" /></div>' +
+      '<div class="field"><label>No. Nota / Surat Jalan (Opsional)</label>' +
+        '<input type="text" id="in-p-nota" placeholder="Contoh: SJ-001" /></div>' +
+      '<div class="field"><label>Tanggal *</label>' +
+        '<input type="date" id="in-p-tanggal" value="' + new Date().toISOString().slice(0, 10) + '" /></div>' +
+      '<div class="field"><label>Catatan (Opsional)</label>' +
+        '<textarea id="in-p-catatan" rows="2" placeholder="Catatan tambahan"></textarea></div>' +
+      '__ERROR__' +
+      '<div class="info-box"><div><b>Supplier boleh dikosongkan</b>Dipakai kalau penerimaan bukan dari supplier/agen tertentu.</div></div>' +
+    '</div>' +
+    '<div class="footer-fixed">' +
+      '<button class="btn btn-primary" data-act="mulai-penerimaan"' + (state.loading ? ' disabled' : '') + '>' + (state.loading ? '<span class="spinner"></span>' : 'Mulai Penerimaan') + '</button>' +
+    '</div>';
+  },
+
+  'penerimaan-scan': function () {
+    const p = state.penerimaan;
+    const items = p.Items || [];
+    const totalQty = items.reduce(function (s, i) { return s + Number(i.Qty); }, 0);
+    const rows = items.map(function (i) {
+      return '<div class="produk-item">' +
+        '<div class="thumb done">📦</div>' +
+        '<div class="info"><div class="nama">' + esc(i.Nama) + '</div>' +
+        '<div class="meta">' + esc(i.Barcode || '-') + '</div></div>' +
+        '<span class="badge neutral">x' + i.Qty + '</span>' +
+      '</div>';
+    }).join('');
+    return '' +
+    '<div class="topbar"><button class="ic-btn" data-act="back-to-penerimaan-list">←</button><h1>' + esc(p.NomorPenerimaan) + '</h1><span class="badge warning">Draft</span></div>' +
+    '<div class="content">' +
+      '<div class="card">' +
+        '<div class="row" style="padding-top:0;"><span class="lbl">Supplier</span><span class="val">' + esc(p.Supplier || '(Tidak diisi)') + '</span></div>' +
+        '<div class="row"><span class="lbl">No. Nota</span><span class="val">' + esc(p.NoNota || '-') + '</span></div>' +
+        '<div class="row"><span class="lbl">Tanggal</span><span class="val">' + fmtTanggal(p.Tanggal) + '</span></div>' +
+      '</div>' +
+      (!state.produkCache ?
+        '<div class="info-box" style="margin-bottom:14px;"><div><b>Katalog belum disinkron</b>Scan barcode masih cek ke server tiap kali (lebih lambat). Kembali ke daftar Penerimaan dan tekan tombol Sinkron dulu biar scan lebih cepat.</div></div>' : '') +
+      '<button class="btn btn-primary" data-act="buka-scan" style="margin-bottom:14px;">📷 Scan Barcode Produk</button>' +
+      '__ERROR__' +
+      '<div class="row" style="padding:0 2px 8px;"><span class="lbl">Barang Diterima</span><span class="val">' + items.length + ' item • ' + totalQty + ' qty</span></div>' +
+      (rows || '<div class="empty-state">Belum ada barang yang discan.</div>') +
+    '</div>' +
+    (items.length > 0 ?
+      '<div class="footer-fixed"><button class="btn btn-primary" data-act="goto-review-penerimaan">Review &amp; Selesaikan</button></div>' : '');
+  },
+
+  'penerimaan-qty': function () {
+    const pr = state.produkPenerimaanAktif;
+    const prevQty = qtyProdukSebelumnya(pr.ProdukId);
+    return '' +
+    '<div class="topbar"><button class="ic-btn" data-act="back-to-penerimaan-scan">←</button><h1>Input Qty</h1><div style="width:34px;"></div></div>' +
+    '<div class="content">' +
+      '<div class="card" style="display:flex;gap:12px;align-items:center;">' +
+        '<div class="thumb" style="width:48px;height:48px;font-size:20px;">📦</div>' +
+        '<div><div style="font-weight:800;font-size:15px;">' + esc(pr.Nama) + '</div>' +
+        '<div style="font-size:12px;color:var(--gray-500);">' + esc(pr.Barcode || '-') + '</div>' +
+        '<div style="font-size:12px;color:var(--gray-500);">Harga Beli Rp' + Number(pr.HargaBeli || 0).toLocaleString('id-ID') + '</div></div>' +
+      '</div>' +
+      '<div class="card">' +
+        '<label style="display:block;font-size:13px;font-weight:600;color:var(--gray-700);margin:0 0 4px;">Qty Diterima *</label>' +
+        '<div class="stepper">' +
+          '<button data-act="qty-p-minus">−</button>' +
+          '<input type="text" inputmode="numeric" id="in-qtypenerimaan" value="' + state.qtyPenerimaanInput + '" />' +
+          '<button data-act="qty-p-plus">+</button>' +
+        '</div>' +
+        (prevQty > 0 ? '<div style="font-size:12px;color:var(--gray-500);text-align:center;margin-top:8px;">Qty sebelumnya untuk produk ini: ' + prevQty + '</div>' : '') +
+      '</div>' +
+      '__ERROR__' +
+    '</div>' +
+    '<div class="footer-fixed"><div class="btn-row">' +
+      '<button class="btn btn-outline" data-act="back-to-penerimaan-scan">Batal</button>' +
+      '<button class="btn btn-primary" data-act="simpan-qty-penerimaan"' + (state.loading ? ' disabled' : '') + '>' + (state.loading ? '<span class="spinner"></span>' : 'Simpan') + '</button>' +
+    '</div></div>';
+  },
+
+  'penerimaan-produk-baru': function () {
+    return '' +
+    '<div class="topbar"><button class="ic-btn" data-act="back-to-penerimaan-scan">←</button><h1>Produk Belum Terdaftar</h1><div style="width:34px;"></div></div>' +
+    '<div class="content">' +
+      '<div class="info-box"><div><b>Barcode baru</b>Produk dengan barcode ini belum ada di sistem. Daftarkan dulu.</div></div>' +
+      '<div class="field"><label>Barcode</label><input type="text" value="' + esc(state.barcodeBaru) + '" disabled /></div>' +
+      '<div class="field"><label>Nama Produk *</label><input type="text" id="in-pb-nama" placeholder="Contoh: Biskuit Roma Kelapa 300g" /></div>' +
+      '<div class="field"><label>Kategori *</label>' +
+        '<select id="in-pb-kategori">' +
+          '<option>Makanan Ringan</option><option>Minuman</option><option>Makanan Instan</option><option>Bahan Pokok</option><option>Lainnya</option>' +
+        '</select></div>' +
+      '<div class="field"><label>Satuan *</label>' +
+        '<select id="in-pb-satuan">' +
+          '<option>Pcs</option><option>Pack</option><option>Box</option><option>Lusin</option><option>Karton</option><option>Kg</option><option>Gram</option><option>Liter</option><option>Botol</option>' +
+        '</select></div>' +
+      '<div class="field"><label>Harga Beli *</label><input type="text" inputmode="numeric" id="in-pb-harga" placeholder="0" /></div>' +
+      '__ERROR__' +
+    '</div>' +
+    '<div class="footer-fixed"><div class="btn-row">' +
+      '<button class="btn btn-outline" data-act="back-to-penerimaan-scan">Batal</button>' +
+      '<button class="btn btn-primary" data-act="simpan-produk-baru-penerimaan"' + (state.loading ? ' disabled' : '') + '>' + (state.loading ? '<span class="spinner"></span>' : 'Simpan & Lanjut') + '</button>' +
+    '</div></div>';
+  },
+
+  'penerimaan-review': function () {
+    const p = state.penerimaan;
+    const items = p.Items || [];
+    const totalQty = items.reduce(function (s, i) { return s + Number(i.Qty); }, 0);
+    const totalNilai = items.reduce(function (s, i) { return s + Number(i.Qty) * Number(i.HargaBeli || 0); }, 0);
+    const rows = items.map(function (i) {
+      return '<div class="row"><span class="lbl">' + esc(i.Nama) + '</span><span class="val">x' + i.Qty + ' • Rp' + (Number(i.Qty) * Number(i.HargaBeli || 0)).toLocaleString('id-ID') + '</span></div>';
+    }).join('');
+    return '' +
+    '<div class="topbar"><button class="ic-btn" data-act="back-to-penerimaan-scan">←</button><h1>Review Penerimaan</h1><div style="width:34px;"></div></div>' +
+    '<div class="content">' +
+      '<div class="card">' +
+        '<div class="row" style="padding-top:0;"><span class="lbl">Nomor</span><span class="val">' + esc(p.NomorPenerimaan) + '</span></div>' +
+        '<div class="row"><span class="lbl">Supplier</span><span class="val">' + esc(p.Supplier || '(Tidak diisi)') + '</span></div>' +
+        '<div class="row"><span class="lbl">Tanggal</span><span class="val">' + fmtTanggal(p.Tanggal) + '</span></div>' +
+      '</div>' +
+      '<div class="card"><div style="font-weight:800;font-size:14px;margin-bottom:6px;">Daftar Barang (' + items.length + ')</div>' + rows + '</div>' +
+      '<div class="card">' +
+        '<div class="row" style="padding-top:0;"><span class="lbl">Total Item</span><span class="val">' + items.length + '</span></div>' +
+        '<div class="row"><span class="lbl">Total Qty</span><span class="val">' + totalQty + '</span></div>' +
+        '<div class="row"><span class="lbl">Total Nilai</span><span class="val">Rp' + totalNilai.toLocaleString('id-ID') + '</span></div>' +
+      '</div>' +
+      '__ERROR__' +
+    '</div>' +
+    '<div class="footer-fixed"><button class="btn btn-primary" data-act="ya-selesaikan-penerimaan"' + (state.loading ? ' disabled' : '') + '>' + (state.loading ? '<span class="spinner"></span>' : 'Selesaikan Penerimaan') + '</button></div>';
+  },
+
+  'penerimaan-selesai': function () {
+    const p = state.penerimaan;
+    const items = p.Items || [];
+    const totalQty = items.reduce(function (s, i) { return s + Number(i.Qty); }, 0);
+    return '' +
+    '<div class="center-content">' +
+      '<div class="center-icon">✓</div>' +
+      '<div class="center-title">Penerimaan Berhasil!</div>' +
+      '<div class="center-sub">Barang sudah tercatat masuk dan tersimpan di server.</div>' +
+      '<div class="card" style="text-align:left;">' +
+        '<div class="row" style="padding-top:0;"><span class="lbl">Nomor</span><span class="val">' + esc(p.NomorPenerimaan) + '</span></div>' +
+        '<div class="row"><span class="lbl">Total Item</span><span class="val">' + items.length + '</span></div>' +
+        '<div class="row"><span class="lbl">Total Qty</span><span class="val">' + totalQty + '</span></div>' +
+      '</div>' +
+      '<button class="btn btn-primary" data-act="selesai-penerimaan-ke-daftar">Kembali ke Daftar</button>' +
+    '</div>';
+  },
+
+  'list-mulai': function () {
+    const cards = state.sesiList.filter(sesiMasukMulai).map(function (s) {
+      const b = statusBadge(s.statusLabel);
+      return '<div class="card card-clickable" data-act="open-sesi" data-id="' + s.Id + '" style="cursor:pointer;">' +
+        '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;">' +
+          '<div style="font-weight:800;font-size:14.5px;">' + esc(s.NomorSO) + '</div>' +
+          '<span class="badge ' + b.cls + '">' + b.text + '</span>' +
+        '</div>' +
+        '<div class="row"><span class="lbl">Rak</span><span class="val">' + esc(fmtRak(s.RakDipilih)) + '</span></div>' +
+        '<div class="row"><span class="lbl">Tanggal</span><span class="val">' + fmtTanggal(s.TanggalOpname) + '</span></div>' +
+        '<div class="row"><span class="lbl">Progress</span><span class="val">' + s.sudahDihitung + ' / ' + s.totalProduk + ' produk</span></div>' +
+        '<button class="btn btn-primary" style="margin-top:10px;pointer-events:none;">Mulai Opname</button>' +
+      '</div>';
+    }).join('');
+
+    return '' +
+    '<div class="topbar"><button class="ic-btn" data-act="back-to-home">←</button><h1>Mulai SO</h1><div style="width:34px;"></div></div>' +
+    '<div class="content">' +
+      '<div class="info-box"><div><b>Sesi Tersedia</b>Pilih sesi stock opname yang akan dikerjakan.</div></div>' +
+      (cards || '<div class="empty-state">Belum ada sesi Stock Opname untuk kamu kerjakan.</div>') +
+    '</div>';
+  },
+
+  'list-edit': function () {
+    const cards = state.sesiList.filter(sesiMasukEdit).map(function (s) {
+      const b = statusBadge(s.statusLabel);
+      return '<div class="card card-clickable" data-act="open-sesi" data-id="' + s.Id + '" style="cursor:pointer;">' +
+        '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;">' +
+          '<div style="font-weight:800;font-size:14.5px;">' + esc(s.NomorSO) + '</div>' +
+          '<span class="badge ' + b.cls + '">' + b.text + '</span>' +
+        '</div>' +
+        '<div class="row"><span class="lbl">Rak</span><span class="val">' + esc(fmtRak(s.RakDipilih)) + '</span></div>' +
+        '<div class="row"><span class="lbl">Tanggal</span><span class="val">' + fmtTanggal(s.TanggalOpname) + '</span></div>' +
+        '<div class="row"><span class="lbl">Progress</span><span class="val">' + s.sudahDihitung + ' / ' + s.totalProduk + ' produk</span></div>' +
+        '<div class="row"><span class="lbl">Pengeditan</span><span class="val"><span class="badge ' + editBadgeInfo(s.EditCount).cls + '">' + editBadgeInfo(s.EditCount).text + '</span></span></div>' +
+        (s.statusLabel === 'MENUNGGU_REVIEW'
+          ? '<div class="info-box success" style="margin-top:10px;margin-bottom:0;"><div>Status akan berubah setelah admin melakukan review.</div></div>'
+          : '') +
+      '</div>';
+    }).join('');
+
+    return '' +
+    '<div class="topbar"><button class="ic-btn" data-act="back-to-home">←</button><h1>Edit SO</h1><div style="width:34px;"></div></div>' +
+    '<div class="content">' +
+      '<div class="info-box"><div><b>Sesi Selesai</b>Pilih sesi buat cek atau koreksi selisih stok.</div></div>' +
+      (cards || '<div class="empty-state">Belum ada sesi Stock Opname yang bisa diedit.</div>') +
+    '</div>';
+  },
+
+  detail: function () {
+    const s = state.sesi;
+    const b = statusBadge(s.statusLabel);
+    return '' +
+    '<div class="topbar"><button class="ic-btn" data-act="back-to-list">←</button><h1>Detail Sesi</h1><div style="width:34px;"></div></div>' +
+    '<div class="content">' +
+      '<div class="card">' +
+        '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;">' +
+          '<div style="font-weight:800;font-size:15px;">' + esc(s.NomorSO) + '</div>' +
+          '<span class="badge ' + b.cls + '">' + b.text + '</span>' +
+        '</div>' +
+        '<div class="row"><span class="lbl">Rak</span><span class="val">' + esc(fmtRak(s.RakDipilih)) + '</span></div>' +
+        '<div class="row"><span class="lbl">Tanggal</span><span class="val">' + fmtTanggal(s.TanggalOpname) + '</span></div>' +
+        '<div class="row"><span class="lbl">Total Produk</span><span class="val">' + s.totalProduk + '</span></div>' +
+      '</div>' +
+      (s.statusLabel === 'MENUNGGU_REVIEW' || s.statusLabel === 'SUDAH_FINAL'
+        ? '<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;">' +
+            '<div><div style="font-size:13px;font-weight:700;margin-bottom:2px;">Indikator Pengeditan</div>' +
+            '<div style="font-size:12px;color:var(--gray-500);">' + editBadgeInfo(s.EditCount).sub + '</div></div>' +
+            '<span class="badge ' + editBadgeInfo(s.EditCount).cls + '">' + editBadgeInfo(s.EditCount).text + '</span>' +
+          '</div></div>'
+        : '') +
+      (s.statusLabel === 'MENUNGGU_REVIEW'
+        ? '<div class="info-box"><div><b>Selisih Stock Opname</b>Ada selisih antara stok sistem dan stok fisik hasil hitung. Cek dan koreksi kalau perlu, lalu Sinkron.</div></div>' +
+          '<button class="btn btn-primary" data-act="lihat-selisih">Lihat Selisih</button>'
+        : (s.statusLabel === 'SUDAH_FINAL'
+          ? '<div class="info-box success"><div><b>Sudah Disesuaikan</b>Stok sistem sudah diperbarui lewat Adjustment/Finalisasi Admin.</div></div>' +
+            '<button class="btn btn-outline" data-act="lihat-selisih">Lihat Riwayat Selisih</button>'
+          : '<div class="info-box"><div><b>Petunjuk</b><ul>' +
+              '<li>Scan barcode produk atau cari nama produk.</li>' +
+              '<li>Isi stok fisik sesuai jumlah yang ada di rak.</li>' +
+              '<li>Pastikan semua produk sudah dihitung.</li>' +
+            '</ul></div></div>' +
+            '<button class="btn btn-primary" data-act="mulai-hitung">Mulai Hitung</button>')) +
+    '</div>';
+  },
+
+  proses: function () {
+    const s = state.sesi;
+    const pct = s.totalProduk ? Math.round((s.sudahDihitung / s.totalProduk) * 100) : 0;
+    let items = s.Items.slice();
+    if (state.filter === 'SUDAH') items = items.filter(function (i) { return i.Dihitung === true; });
+    if (state.filter === 'BELUM') items = items.filter(function (i) { return i.Dihitung !== true; });
+    if (state.search.trim()) {
+      const q = state.search.trim().toLowerCase();
+      items = items.filter(function (i) {
+        return (i.Nama || '').toLowerCase().indexOf(q) !== -1 || (i.Barcode || '').toLowerCase().indexOf(q) !== -1;
+      });
+    }
+    const rows = items.map(function (i) {
+      return '<div class="produk-item" data-act="buka-input" data-id="' + i.ProdukId + '">' +
+        '<div class="thumb' + (i.Dihitung ? ' done' : '') + '">' + (i.Dihitung ? '✓' : '📦') + '</div>' +
+        '<div class="info"><div class="nama">' + esc(i.Nama) + '</div><div class="meta">' + esc(i.Barcode || '-') + ' · Rak ' + esc(i.Rak || '-') + '</div></div>' +
+        '<div class="right"><div class="sf">' + (i.Dihitung ? i.StokFisik : '—') + '</div><div class="sf-label">' + (i.Dihitung ? 'Stok Fisik' : 'Belum') + '</div></div>' +
+        '<div class="chev">›</div>' +
+      '</div>';
+    }).join('');
+
+    const allDone = s.belumDihitung === 0;
+
+    return '' +
+    '<div class="topbar"><button class="ic-btn" data-act="back-to-detail">←</button><h1>Proses Opname</h1><div style="width:34px;"></div></div>' +
+    '<div class="content">' +
+      '<div class="progress-wrap"><div class="progress-top"><span>Progress</span><span>' + pct + '%</span></div>' +
+        '<div class="progress-track"><div class="progress-fill" style="width:' + pct + '%"></div></div></div>' +
+      '<div class="stat-row">' +
+        '<div class="stat"><div class="n">' + s.totalProduk + '</div><div class="l">Total Produk</div></div>' +
+        '<div class="stat"><div class="n" style="color:var(--success)">' + s.sudahDihitung + '</div><div class="l">Sudah Dihitung</div></div>' +
+        '<div class="stat"><div class="n" style="color:var(--warning)">' + s.belumDihitung + '</div><div class="l">Belum Dihitung</div></div>' +
+      '</div>' +
+      (allDone ? '<div class="info-box success"><div><b>Semua produk sudah dihitung!</b>Periksa kembali sebelum menyelesaikan stock opname.</div></div>' : '') +
+      '<div class="chip-row">' +
+        '<div class="chip' + (state.filter === 'SEMUA' ? ' active' : '') + '" data-act="filter" data-f="SEMUA">Semua (' + s.totalProduk + ')</div>' +
+        '<div class="chip' + (state.filter === 'SUDAH' ? ' active' : '') + '" data-act="filter" data-f="SUDAH">Sudah (' + s.sudahDihitung + ')</div>' +
+        '<div class="chip' + (state.filter === 'BELUM' ? ' active' : '') + '" data-act="filter" data-f="BELUM">Belum (' + s.belumDihitung + ')</div>' +
+      '</div>' +
+      '<div class="search-box"><span class="ic">⌕</span><input id="in-search" placeholder="Cari produk / scan barcode" value="' + esc(state.search) + '" />' +
+        '<button type="button" class="scan-btn" data-act="buka-scan" title="Scan Barcode">📷</button>' +
+      '</div>' +
+      (rows || '<div class="empty-state">Tidak ada produk di daftar ini.</div>') +
+    '</div>' +
+    '<div class="footer-fixed">' + (allDone
+      ? '<button class="btn btn-primary" data-act="goto-konfirmasi">Selesaikan Opname</button>'
+      : '<button class="btn btn-outline" disabled>Selesaikan Opname (' + s.belumDihitung + ' produk belum dihitung)</button>') +
+    '</div>';
+  },
+
+  'selisih-list': function () {
+    const s = state.sesi;
+    let items = s.Items.filter(function (i) { return hitungSelisih(i) !== 0; });
+    const nMinus = items.filter(function (i) { return hitungSelisih(i) < 0; }).length;
+    const nPlus = items.filter(function (i) { return hitungSelisih(i) > 0; }).length;
+    if (state.selisihFilter === 'MINUS') items = items.filter(function (i) { return hitungSelisih(i) < 0; });
+    if (state.selisihFilter === 'PLUS') items = items.filter(function (i) { return hitungSelisih(i) > 0; });
+    if (state.search.trim()) {
+      const q = state.search.trim().toLowerCase();
+      items = items.filter(function (i) {
+        return (i.Nama || '').toLowerCase().indexOf(q) !== -1 || (i.Barcode || '').toLowerCase().indexOf(q) !== -1;
+      });
+    }
+    const totalNilaiSelisih = s.Items.reduce(function (sum, i) { return sum + hitungSelisih(i) * Number(i.HargaBeli || 0); }, 0);
+
+    const rows = items.map(function (i) {
+      const sel = hitungSelisih(i);
+      const selCls = sel < 0 ? 'neg' : 'pos';
+      return '<div class="produk-item" data-act="buka-edit-selisih" data-id="' + i.ProdukId + '">' +
+        '<div class="thumb">📦</div>' +
+        '<div class="info"><div class="nama">' + esc(i.Nama) + '</div><div class="meta">' + esc(i.Barcode || '-') + ' · Rak ' + esc(i.Rak || '-') + '</div></div>' +
+        '<div class="right"><div class="sf selisih ' + selCls + '" style="margin:0;">' + (sel > 0 ? '+' : '') + sel + '</div><div class="sf-label">Sistem - · Fisik ' + i.StokFisik + '</div></div>' +
+        '<div class="chev">›</div>' +
+      '</div>';
+    }).join('');
+
+    return '' +
+    '<div class="topbar"><button class="ic-btn" data-act="back-to-detail">←</button><h1>Daftar Selisih</h1><button class="ic-btn" data-act="goto-sinkron">☁</button></div>' +
+    '<div class="content">' +
+      '<div class="stat-row" style="margin-top:0;">' +
+        '<div class="stat"><div class="n">' + items.length + (state.selisihFilter === 'SEMUA' && !state.search.trim() ? '' : '/' + (nMinus + nPlus)) + '</div><div class="l">Total Item Selisih</div></div>' +
+        '<div class="stat"><div class="n" style="color:' + (totalNilaiSelisih < 0 ? 'var(--danger)' : 'var(--success)') + '">Rp' + Math.abs(totalNilaiSelisih).toLocaleString('id-ID') + '</div><div class="l">Total Nilai Selisih</div></div>' +
+      '</div>' +
+      '<div class="chip-row">' +
+        '<div class="chip' + (state.selisihFilter === 'SEMUA' ? ' active' : '') + '" data-act="selisih-filter" data-f="SEMUA">Semua (' + (nMinus + nPlus) + ')</div>' +
+        '<div class="chip' + (state.selisihFilter === 'PLUS' ? ' active' : '') + '" data-act="selisih-filter" data-f="PLUS">Selisih Plus (' + nPlus + ')</div>' +
+        '<div class="chip' + (state.selisihFilter === 'MINUS' ? ' active' : '') + '" data-act="selisih-filter" data-f="MINUS">Selisih Minus (' + nMinus + ')</div>' +
+      '</div>' +
+      '<div class="search-box"><span class="ic">⌕</span><input id="in-search" placeholder="Cari produk / scan barcode" value="' + esc(state.search) + '" />' +
+        '<button type="button" class="scan-btn" data-act="buka-scan" title="Scan Barcode">📷</button>' +
+      '</div>' +
+      (rows || '<div class="empty-state">Tidak ada produk selisih di daftar ini.</div>') +
+    '</div>';
+  },
+
+  input: function () {
+    const i = state.activeItem;
+    const selisih = state.stokFisikInput - Number(i.StokSistem);
+    const selisihCls = selisih < 0 ? 'neg' : (selisih > 0 ? 'pos' : 'zero');
+    return '' +
+    '<div class="topbar"><button class="ic-btn" data-act="back-to-proses">←</button><h1>Input Stok Fisik</h1><div style="width:34px;"></div></div>' +
+    '<div class="content">' +
+      '<div class="card" style="display:flex;gap:12px;align-items:center;">' +
+        '<div class="thumb" style="width:48px;height:48px;font-size:20px;">📦</div>' +
+        '<div><div style="font-weight:800;font-size:15px;">' + esc(i.Nama) + '</div>' +
+        '<div style="font-size:12px;color:var(--gray-500);">' + esc(i.Barcode || '-') + '</div>' +
+        '<div style="font-size:12px;color:var(--gray-500);">Rak ' + esc(i.Rak || '-') + '</div></div>' +
+      '</div>' +
+      '<div class="card">' +
+        '<div class="row" style="padding-top:0;"><span class="lbl">Stok Sistem</span><span class="val" style="letter-spacing:2px;color:var(--gray-400);">🔒</span></div>' +
+        '<label style="display:block;font-size:13px;font-weight:600;color:var(--gray-700);margin:14px 0 4px;">Stok Fisik (Hitung Sekarang) *</label>' +
+        '<div class="stepper">' +
+          '<button data-act="stepper-minus">−</button>' +
+          '<input type="text" inputmode="numeric" id="in-stokfisik" value="' + state.stokFisikInput + '" />' +
+          '<button data-act="stepper-plus">+</button>' +
+        '</div>' +
+        '<div style="font-size:12px;color:var(--gray-500);text-align:center;margin-top:8px;">Selisih ditampilkan setelah disimpan.</div>' +
+        '<label style="display:block;font-size:13px;font-weight:600;color:var(--gray-700);margin:14px 0 4px;">Catatan (Opsional)</label>' +
+        '<textarea id="in-catatan" rows="2" maxlength="100" placeholder="Contoh: kemasan penyok, dll.">' + esc(state.catatanInput) + '</textarea>' +
+        '<div class="char-count">' + state.catatanInput.length + '/100</div>' +
+      '</div>' +
+      '__ERROR__' +
+    '</div>' +
+    '<div class="footer-fixed"><div class="btn-row">' +
+      '<button class="btn btn-outline" data-act="back-to-proses">Batal</button>' +
+      '<button class="btn btn-primary" data-act="simpan-stok"' + (state.loading ? ' disabled' : '') + '>' + (state.loading ? '<span class="spinner"></span>' : 'Simpan') + '</button>' +
+    '</div></div>';
+  },
+
+  konfirmasi: function () {
+    const s = state.sesi;
+    return '' +
+    '<div class="topbar"><button class="ic-btn" data-act="back-to-proses">←</button><h1>Konfirmasi Selesai</h1><div style="width:34px;"></div></div>' +
+    '<div class="content" style="padding-top:30px;">' +
+      '<div class="center-icon blue">📋</div>' +
+      '<div class="center-title">Selesaikan Stock Opname?</div>' +
+      '<div class="center-sub">Pastikan semua produk sudah dihitung dengan jumlah yang benar.</div>' +
+      '<div class="card">' +
+        '<div class="row" style="padding-top:0;"><span class="lbl">Total Produk</span><span class="val">' + s.totalProduk + '</span></div>' +
+        '<div class="row"><span class="lbl">Sudah Dihitung</span><span class="val">' + s.sudahDihitung + '</span></div>' +
+        '<div class="row"><span class="lbl">Belum Dihitung</span><span class="val">' + s.belumDihitung + '</span></div>' +
+      '</div>' +
+      '__ERROR__' +
+      '<div class="btn-row">' +
+        '<button class="btn btn-outline" data-act="back-to-proses">Batal</button>' +
+        '<button class="btn btn-primary" data-act="ya-selesaikan"' + (state.loading ? ' disabled' : '') + '>' + (state.loading ? '<span class="spinner"></span>' : 'Ya, Selesaikan') + '</button>' +
+      '</div>' +
+    '</div>';
+  },
+
+  'selisih-edit': function () {
+    const i = state.selisihItem;
+    const badge = selisihEditBadge(i);
+    const locked = badge.cls === 'danger';
+    const selisihBaru = state.stokKoreksiInput - Number(i.StokSistem);
+    const selCls = selisihBaru < 0 ? 'neg' : (selisihBaru > 0 ? 'pos' : 'zero');
+    return '' +
+    '<div class="topbar"><button class="ic-btn" data-act="back-to-selisih-list">←</button><h1>Edit Selisih</h1><button class="ic-btn" data-act="goto-riwayat-selisih">📜</button></div>' +
+    '<div class="content">' +
+      '<div class="card" style="display:flex;gap:12px;align-items:center;">' +
+        '<div class="thumb" style="width:48px;height:48px;font-size:20px;">📦</div>' +
+        '<div><div style="font-weight:800;font-size:15px;">' + esc(i.Nama) + '</div>' +
+        '<div style="font-size:12px;color:var(--gray-500);">Rak ' + esc(i.Rak || '-') + '</div></div>' +
+      '</div>' +
+      '<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;">' +
+        '<div><div style="font-size:13px;font-weight:700;margin-bottom:2px;">Indikator Pengeditan</div>' +
+        '<div style="font-size:12px;color:var(--gray-500);">' + badge.sub + '</div></div>' +
+        '<span class="badge ' + badge.cls + '">' + badge.text + '</span>' +
+      '</div></div>' +
+      (locked
+        ? '<div class="info-box" style="background:var(--danger-tint);color:#B91C1C;"><div><b>Batas Pengeditan Tercapai</b>Produk ini sudah diedit maksimal ' + STOCK_OPNAME_MAX_REVISI + ' kali. Hubungi Admin untuk Adjustment/Finalisasi.</div></div>' +
+          '<button class="btn btn-outline" data-act="goto-riwayat-selisih">Lihat Riwayat Edit</button>'
+        : '<div class="card">' +
+            '<div class="row" style="padding-top:0;"><span class="lbl">Stok Sistem</span><span class="val" style="letter-spacing:2px;color:var(--gray-400);">🔒</span></div>' +
+            '<div class="row"><span class="lbl">Stok Fisik (Sebelum)</span><span class="val">' + i.StokFisik + '</span></div>' +
+            '<label style="display:block;font-size:13px;font-weight:600;color:var(--gray-700);margin:14px 0 4px;">Stok Fisik (Koreksi) *</label>' +
+            '<div class="stepper">' +
+              '<button data-act="selisih-stepper-minus">−</button>' +
+              '<input type="text" inputmode="numeric" id="in-stokkoreksi" value="' + state.stokKoreksiInput + '" />' +
+              '<button data-act="selisih-stepper-plus">+</button>' +
+            '</div>' +
+            '<div style="font-size:12px;color:var(--gray-500);text-align:center;margin-top:8px;">Selisih ditampilkan setelah disimpan.</div>' +
+            '<label style="display:block;font-size:13px;font-weight:600;color:var(--gray-700);margin:14px 0 4px;">Catatan (Opsional)</label>' +
+            '<textarea id="in-catatankoreksi" rows="2" maxlength="200" placeholder="Contoh: salah hitung, produk hilang, dll.">' + esc(state.catatanKoreksiInput) + '</textarea>' +
+            '<div class="char-count">' + state.catatanKoreksiInput.length + '/200</div>' +
+            '<div style="font-size:11.5px;color:var(--gray-500);text-align:center;margin-top:4px;">Maksimal ' + STOCK_OPNAME_MAX_REVISI + 'x pengeditan.</div>' +
+          '</div>') +
+      '__ERROR__' +
+    '</div>' +
+    (locked ? '' :
+    '<div class="footer-fixed"><div class="btn-row">' +
+      '<button class="btn btn-outline" data-act="back-to-selisih-list">Batal</button>' +
+      '<button class="btn btn-primary" data-act="simpan-koreksi-selisih"' + (state.loading ? ' disabled' : '') + '>' + (state.loading ? '<span class="spinner"></span>' : 'Simpan Perubahan') + '</button>' +
+    '</div></div>');
+  },
+
+  'riwayat-selisih': function () {
+    const i = state.selisihItem;
+    const badge = selisihEditBadge(i);
+    const riwayat = i.RiwayatEdit || [];
+    const rows = riwayat.length ? riwayat.map(function (r, idx) {
+      const selR = Number(r.StokFisik) - Number(i.StokSistem);
+      const selRCls = selR < 0 ? 'neg' : (selR > 0 ? 'pos' : 'zero');
+      return '<div class="card" style="margin-bottom:10px;">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">' +
+          '<span class="badge neutral">Edit ke-' + (idx + 1) + (idx === 0 ? ' (Asli)' : '') + '</span>' +
+          '<span class="selisih ' + selRCls + '" style="margin:0;">' + (selR > 0 ? '+' : '') + selR + '</span>' +
+        '</div>' +
+        '<div class="row" style="padding-top:0;"><span class="lbl">Oleh</span><span class="val">' + esc(r.Oleh || '-') + '</span></div>' +
+        '<div class="row"><span class="lbl">Stok Fisik</span><span class="val">' + r.StokFisik + '</span></div>' +
+        '<div class="row"><span class="lbl">Waktu</span><span class="val">' + fmtWaktu(r.Waktu) + '</span></div>' +
+        (r.Catatan ? '<div class="row"><span class="lbl">Catatan</span><span class="val" style="text-align:right;">' + esc(r.Catatan) + '</span></div>' : '') +
+      '</div>';
+    }).join('') : '<div class="empty-state">Belum ada riwayat pengeditan untuk produk ini.</div>';
+
+    return '' +
+    '<div class="topbar"><button class="ic-btn" data-act="back-to-selisih-edit">←</button><h1>Riwayat Edit</h1><button class="ic-btn" data-act="goto-sinkron">☁</button></div>' +
+    '<div class="content">' +
+      '<div class="card" style="display:flex;gap:12px;align-items:center;">' +
+        '<div class="thumb" style="width:48px;height:48px;font-size:20px;">📦</div>' +
+        '<div style="flex:1;"><div style="font-weight:800;font-size:15px;">' + esc(i.Nama) + '</div>' +
+        '<div style="font-size:12px;color:var(--gray-500);">Rak ' + esc(i.Rak || '-') + '</div></div>' +
+        '<span class="badge ' + badge.cls + '">' + badge.text + '</span>' +
+      '</div>' +
+      rows +
+    '</div>';
+  },
+
+  sinkron: function () {
+    return '' +
+    '<div class="topbar"><button class="ic-btn" data-act="back-to-selisih-list">←</button><h1>Sinkron</h1><div style="width:34px;"></div></div>' +
+    '<div class="content" style="padding-top:24px;">' +
+      '<div class="center-icon blue">☁</div>' +
+      '<div class="center-title">Sinkronkan Data</div>' +
+      '<div class="center-sub">Kirim perubahan koreksi selisih ke server supaya Admin dan perangkat lain lihat data terbaru.</div>' +
+      '<div class="card">' +
+        '<div class="row" style="padding-top:0;"><span class="lbl">Terakhir Sinkron</span><span class="val">' + (state.lastSync ? fmtWaktu(state.lastSync) : 'Belum pernah') + '</span></div>' +
+      '</div>' +
+      '__ERROR__' +
+      '<button class="btn btn-primary" data-act="sinkron-sekarang"' + (state.loading ? ' disabled' : '') + '>' + (state.loading ? '<span class="spinner"></span>' : 'Sinkron Sekarang') + '</button>' +
+    '</div>';
+  },
+
+  selesai: function () {
+    const s = state.sesi;
+    return '' +
+    '<div class="center-content">' +
+      '<div class="center-icon">✓</div>' +
+      '<div class="center-title">Stock Opname Selesai!</div>' +
+      '<div class="center-sub">Data stock opname sudah tersimpan di server dan menunggu review Admin.</div>' +
+      '<div class="card" style="text-align:left;">' +
+        '<div class="row" style="padding-top:0;"><span class="lbl">Sesi</span><span class="val">' + esc(s.NomorSO) + '</span></div>' +
+        '<div class="row"><span class="lbl">Rak</span><span class="val">' + esc(fmtRak(s.RakDipilih)) + '</span></div>' +
+        '<div class="row"><span class="lbl">Total Produk</span><span class="val">' + s.totalProduk + '</span></div>' +
+        '<div class="row"><span class="lbl">Selesai Pada</span><span class="val">' + fmtWaktu(new Date()) + '</span></div>' +
+      '</div>' +
+      '<button class="btn btn-primary" data-act="selesai-ke-daftar">Kembali ke Daftar Sesi</button>' +
+    '</div>';
+  }
+};
+
+function bindEvents() {
+  document.querySelectorAll('[data-act]').forEach(function (el) {
+    el.addEventListener('click', function () {
+      // PERBAIKAN: sebelum ini gak ada guard sama sekali - tombol "Ya, Selesaikan"/"Simpan"/
+      // dll pas loading cuma ganti teks jadi spinner, TAPI TETAP BISA DIKLIK LAGI. User yang
+      // gak sabar nunggu (request ke GAS Web App emang bisa 1-3 detik) jadi numpuk banyak klik,
+      // tiap klik ngirim request BARU ke server bareng-bareng - saling antre, berasa "macet"
+      // lama banget. Guard ini nolak SEMUA klik data-act selama masih ada request jalan.
+      if (state.loading) return;
+      const act = el.getAttribute('data-act');
+      // PERBAIKAN: stepper +/- + alur inti hitung (buka produk, simpan, lanjut) dipencet
+      // berkali-kali/berturut-turut - jeda 110ms bikin lelet. Screen udah ganti = feedback-nya
+      // sendiri, gak butuh flash tambahan. Cuma tombol navigasi jarang-pencet yang pake jeda.
+      const isFastTap = (act === 'stepper-minus' || act === 'stepper-plus' ||
+        act === 'selisih-stepper-minus' || act === 'selisih-stepper-plus' ||
+        act === 'buka-input' || act === 'simpan-stok' || act === 'back-to-proses' ||
+        act === 'qty-p-minus' || act === 'qty-p-plus');
+      if (isFastTap) { handleAction(act, el); return; }
+      // PERBAIKAN: klik/tap langsung render() ganti seluruh halaman - :active CSS udah
+      // keburu hilang (kepencet cuma pas jari nempel) sebelum sempat kelihatan, jadi tap
+      // berasa "kosong". Kasih jeda dikit + flash manual biar kerasa dulu, baru aksi jalan.
+      el.classList.add('tap-flash');
+      setTimeout(function () { handleAction(act, el); }, 110);
+    });
+  });
+  const inSearch = document.getElementById('in-search');
+  if (inSearch) inSearch.addEventListener('input', function (e) { state.search = e.target.value; render(); preserveFocus('in-search'); });
+  const inCatatan = document.getElementById('in-catatan');
+  if (inCatatan) inCatatan.addEventListener('input', function (e) { state.catatanInput = e.target.value.slice(0, 100); render(); preserveFocus('in-catatan'); });
+  const inStok = document.getElementById('in-stokfisik');
+  if (inStok) inStok.addEventListener('input', function (e) {
+    const n = Number(e.target.value.replace(/[^0-9]/g, '')) || 0;
+    state.stokFisikInput = n; render(); preserveFocus('in-stokfisik');
+  });
+  const inKoreksi = document.getElementById('in-stokkoreksi');
+  if (inKoreksi) inKoreksi.addEventListener('input', function (e) {
+    const n = Number(e.target.value.replace(/[^0-9]/g, '')) || 0;
+    state.stokKoreksiInput = n; render(); preserveFocus('in-stokkoreksi');
+  });
+  const inQtyP = document.getElementById('in-qtypenerimaan');
+  if (inQtyP) inQtyP.addEventListener('input', function (e) {
+    const n = Number(e.target.value.replace(/[^0-9]/g, '')) || 0;
+    state.qtyPenerimaanInput = n; render(); preserveFocus('in-qtypenerimaan');
+  });
+  const inHargaBaru = document.getElementById('in-pb-harga');
+  if (inHargaBaru) inHargaBaru.addEventListener('input', function (e) {
+    e.target.value = e.target.value.replace(/[^0-9]/g, '');
+  });
+  const inFotoKamera = document.getElementById('in-foto-kamera');
+  if (inFotoKamera) inFotoKamera.addEventListener('change', function (e) { pilihFotoPengantaran(e.target.files[0]); });
+  const inFotoGaleri = document.getElementById('in-foto-galeri');
+  if (inFotoGaleri) inFotoGaleri.addEventListener('change', function (e) { pilihFotoPengantaran(e.target.files[0]); });
+  const inCatatanSelesai = document.getElementById('in-catatan-selesai');
+  if (inCatatanSelesai) inCatatanSelesai.addEventListener('input', function (e) { state.pengantaranCatatan = e.target.value.slice(0, 200); preserveFocus('in-catatan-selesai'); });
+  const inCatatanKoreksi = document.getElementById('in-catatankoreksi');
+  if (inCatatanKoreksi) inCatatanKoreksi.addEventListener('input', function (e) { state.catatanKoreksiInput = e.target.value.slice(0, 200); render(); preserveFocus('in-catatankoreksi'); });
+  // OPTIMASI: auto-fokus + auto-select isi input stok fisik begitu layar dibuka,
+  // petugas langsung ketik angka tanpa perlu tap ke field dulu - hemat 1 tap tiap produk.
+  if (state.focusStokFisik) {
+    state.focusStokFisik = false;
+    const inpFocus = document.getElementById('in-stokfisik');
+    if (inpFocus) { inpFocus.focus(); inpFocus.select(); }
+  }
+}
+function preserveFocus(id) {
+  const el = document.getElementById(id);
+  if (el) { el.focus(); const v = el.value; el.value = ''; el.value = v; }
+}
+
+function handleAction(act, el) {
+  if (act === 'toggle-pw') { state.showPw = !state.showPw; render(); return; }
+  if (act === 'login') {
+    const u = document.getElementById('in-username').value.trim();
+    const p = document.getElementById('in-password').value;
+    if (!u || !p) { state.error = 'Username dan password wajib diisi.'; render(); return; }
+    doLogin(u, p); return;
+  }
+  if (act === 'logout') { state.token = null; state.user = null; hapusSesiTersimpan(); goto('login'); return; }
+  if (act === 'goto-list-mulai') { state.listOrigin = 'mulai'; goto('list-mulai'); refreshSesiListSilent(); return; }
+  if (act === 'goto-list-edit') { state.listOrigin = 'edit'; goto('list-edit'); refreshSesiListSilent(); return; }
+  if (act === 'goto-penerimaan') { bukaPenerimaanList(); return; }
+  if (act === 'goto-pengantaran') { bukaPengantaranList(); return; }
+  if (act === 'filter-pengantaran') { state.pengantaranFilter = el.getAttribute('data-f'); render(); return; }
+  if (act === 'retry-pengantaran') { refreshPengantaranListSilent(); return; }
+  if (act === 'pilih-pengantaran') { bukaPengantaranDetail(el.getAttribute('data-id')); return; }
+  if (act === 'back-to-pengantaran-list') { bukaPengantaranList(); return; }
+  if (act === 'mulai-pengantaran') { mulaiPengantaran(); return; }
+  if (act === 'lanjut-pengantaran-foto') { state.pengantaranFoto = state.pengantaranAktif.Foto; goto('pengantaran-foto'); return; }
+  if (act === 'back-to-pengantaran-detail') { goto('pengantaran-detail'); return; }
+  if (act === 'ambil-foto') { document.getElementById('in-foto-kamera').click(); return; }
+  if (act === 'pilih-galeri') { document.getElementById('in-foto-galeri').click(); return; }
+  if (act === 'ubah-foto') { goto('pengantaran-foto'); return; }
+  if (act === 'lanjut-selesaikan-pengantaran') { lanjutSelesaikanPengantaran(); return; }
+  if (act === 'back-to-pengantaran-foto') { goto('pengantaran-foto'); return; }
+  if (act === 'selesaikan-pengantaran') { selesaikanPengantaran(); return; }
+  if (act === 'sinkron-katalog-produk') { sinkronKatalogProduk(); return; }
+  if (act === 'goto-penerimaan-buat') { goto('penerimaan-buat'); return; }
+  if (act === 'back-to-penerimaan-list') { bukaPenerimaanList(); return; }
+  if (act === 'filter-penerimaan') { state.penerimaanFilter = el.getAttribute('data-f'); render(); return; }
+  if (act === 'mulai-penerimaan') { mulaiPenerimaanBaru(); return; }
+  if (act === 'buka-penerimaan-draft') { bukaPenerimaanDraft(el.getAttribute('data-id')); return; }
+  if (act === 'hapus-penerimaan') { hapusPenerimaan(el.getAttribute('data-id')); return; }
+  if (act === 'back-to-penerimaan-scan') { state.produkPenerimaanAktif = null; state.barcodeBaru = ''; goto('penerimaan-scan'); return; }
+  if (act === 'qty-p-minus' || act === 'qty-p-plus') {
+    state.qtyPenerimaanInput = act === 'qty-p-plus' ? state.qtyPenerimaanInput + 1 : Math.max(1, state.qtyPenerimaanInput - 1);
+    const inpQ = document.getElementById('in-qtypenerimaan');
+    if (inpQ) inpQ.value = state.qtyPenerimaanInput; else render();
+    return;
+  }
+  if (act === 'simpan-qty-penerimaan') { simpanQtyPenerimaan(); return; }
+  if (act === 'simpan-produk-baru-penerimaan') {
+    const nama = document.getElementById('in-pb-nama').value.trim();
+    const kategori = document.getElementById('in-pb-kategori').value;
+    const satuan = document.getElementById('in-pb-satuan').value;
+    const harga = Number(document.getElementById('in-pb-harga').value.replace(/[^0-9]/g, '')) || 0;
+    if (!nama || !satuan || !harga) { state.error = 'Nama produk, satuan, dan harga beli wajib diisi.'; render(); return; }
+    submitProdukBaruPenerimaan(nama, kategori, satuan, harga); return;
+  }
+  if (act === 'goto-review-penerimaan') { goto('penerimaan-review'); return; }
+  if (act === 'ya-selesaikan-penerimaan') { selesaikanPenerimaan(); return; }
+  if (act === 'selesai-penerimaan-ke-daftar') { bukaPenerimaanList(); return; }
+  if (act === 'back-to-home') { goto('home'); return; }
+  if (act === 'open-sesi') { openSesi(el.getAttribute('data-id')); return; }
+  if (act === 'back-to-list') { goto(state.listOrigin === 'edit' ? 'list-edit' : 'list-mulai'); refreshSesiListSilent(); return; }
+  if (act === 'mulai-hitung') { mulaiHitung(); return; }
+  if (act === 'back-to-detail') { openSesi(state.sesi.Id); return; }
+  if (act === 'filter') { state.filter = el.getAttribute('data-f'); render(); return; }
+  if (act === 'lihat-selisih') { lihatSelisih(); return; }
+  if (act === 'selisih-filter') { state.selisihFilter = el.getAttribute('data-f'); render(); return; }
+  if (act === 'buka-edit-selisih') {
+    const item = state.sesi.Items.filter(function (i) { return String(i.ProdukId) === el.getAttribute('data-id'); })[0];
+    bukaEditSelisih(item); return;
+  }
+  if (act === 'back-to-selisih-list') { goto('selisih-list'); return; }
+  if (act === 'selisih-stepper-minus' || act === 'selisih-stepper-plus') {
+    state.stokKoreksiInput = act === 'selisih-stepper-plus' ? state.stokKoreksiInput + 1 : Math.max(0, state.stokKoreksiInput - 1);
+    // PERBAIKAN: dulu render() penuh tiap tap - berat & delay kalau dipencet cepat-cepat.
+    // Sekarang update langsung ke elemen input-nya aja, instant, gak reflow seluruh halaman.
+    const inpK = document.getElementById('in-stokkoreksi');
+    if (inpK) inpK.value = state.stokKoreksiInput; else render();
+    return;
+  }
+  if (act === 'simpan-koreksi-selisih') { simpanKoreksiSelisih(); return; }
+  if (act === 'goto-riwayat-selisih') { goto('riwayat-selisih'); return; }
+  if (act === 'back-to-selisih-edit') { goto('selisih-edit'); return; }
+  if (act === 'goto-sinkron') { goto('sinkron'); return; }
+  if (act === 'sinkron-sekarang') { sinkronSekarang(); return; }
+  if (act === 'buka-scan') { bukaScan(); return; }
+  if (act === 'scan-tutup') { tutupScan(); return; }
+  if (act === 'scan-coba-lagi') { state.scanState = 'starting'; renderScanOverlay(); startScanner(); return; }
+  if (act === 'buka-input') {
+    const item = state.sesi.Items.filter(function (i) { return String(i.ProdukId) === el.getAttribute('data-id'); })[0];
+    bukaInputStok(item); return;
+  }
+  if (act === 'stepper-minus' || act === 'stepper-plus') {
+    state.stokFisikInput = act === 'stepper-plus' ? state.stokFisikInput + 1 : Math.max(0, state.stokFisikInput - 1);
+    const inpS = document.getElementById('in-stokfisik');
+    if (inpS) inpS.value = state.stokFisikInput; else render();
+    return;
+  }
+  if (act === 'simpan-stok') { simpanStokFisik(); return; }
+  if (act === 'back-to-proses') { goto('proses'); return; }
+  if (act === 'goto-konfirmasi') { goto('konfirmasi'); return; }
+  if (act === 'ya-selesaikan') { selesaikanOpname(); return; }
+  if (act === 'selesai-ke-daftar') { state.listOrigin = 'mulai'; goto('list-mulai'); refreshSesiListSilent(); return; }
+}
+
+// ---- Bootstrap: pulihkan sesi login & halaman terakhir saat app dimuat --
+// Dipanggil sekali saat app pertama kali dibuka/refresh. Kalau ada token
+// tersimpan, coba pulihkan langsung ke halaman terakhir (bukan balik ke
+// Login). Kalau token sudah kadaluarsa/invalid di server, otomatis fallback
+// ke Login (tanpa nyangkut/nge-blank).
+function initApp() {
+  const saved = bacaSesiTersimpan();
+  if (!saved || !saved.token) { render(); return; }
+
+  state.token = saved.token;
+  state.user = saved.user;
+  state.listOrigin = saved.listOrigin || 'mulai';
+
+  // Halaman yang cukup butuh data sesi (Items) untuk ditampilkan ulang -
+  // aman dipulihkan langsung.
+  const viewsBisaLangsung = ['detail', 'proses', 'selisih-list', 'sinkron', 'selesai'];
+  // Halaman yang butuh state sesaat (item aktif yang sedang diinput/diedit) -
+  // state itu tidak disimpan, jadi baliknya ke halaman induk yang terdekat.
+  const fallbackView = {
+    input: 'proses',
+    konfirmasi: 'proses',
+    'selisih-edit': 'selisih-list',
+    'riwayat-selisih': 'selisih-list',
+    'penerimaan-buat': 'penerimaan',
+    'penerimaan-scan': 'penerimaan',
+    'penerimaan-qty': 'penerimaan',
+    'penerimaan-produk-baru': 'penerimaan',
+    'penerimaan-review': 'penerimaan',
+    'penerimaan-selesai': 'penerimaan',
+    'pengantaran-detail': 'pengantaran',
+    'pengantaran-foto': 'pengantaran',
+    'pengantaran-selesai': 'pengantaran'
+  };
+  const viewsTanpaSesi = ['home', 'list-mulai', 'list-edit', 'penerimaan', 'pengantaran'];
+
+  state.loading = true;
+  render();
+
+  (async function () {
+    try {
+      // Validasi token sekaligus ambil daftar sesi - kalau token sudah tidak
+      // valid/kadaluarsa di server, api() akan melempar error (masuk ke catch).
+      state.sesiList = await api('apiListStockOpnameUntukPetugas', { token: state.token });
+
+      // Pengantaran Online - dimuat sekalian di startup (bukan nunggu buka menu) supaya
+      // badge jumlah DIPROSES di Home langsung benar. Kegagalan di sini TIDAK bikin
+      // logout (beda dari sesiList di atas) - cukup badge tetap 0 sampai berhasil nanti.
+      try {
+        const pengantaran = await api('apiListPengantaranUntukPetugas', { token: state.token });
+        state.pengantaranList = (pengantaran || []).map(pengMapDariServer);
+      } catch (e) { /* diam - badge Pengantaran tetap 0, coba lagi saat menu dibuka */ }
+
+      let targetView = fallbackView[saved.view] || saved.view;
+
+      if (viewsBisaLangsung.indexOf(targetView) !== -1 && saved.sesiId) {
+        try {
+          state.sesi = await api('apiGetStockOpnameDetailUntukPetugas', { token: state.token, stockOpnameId: saved.sesiId });
+        } catch (e) {
+          targetView = 'home'; // sesi sudah tidak ada/berubah - aman balik ke Home
+        }
+      } else if (viewsTanpaSesi.indexOf(targetView) === -1) {
+        targetView = 'home';
+      }
+
+      state.view = targetView;
+      simpanSesiTerakhir();
+    } catch (e) {
+      // Token sudah tidak valid/kadaluarsa di server - bersihkan sesi tersimpan
+      // dan pastikan mendarat rapi di halaman Login tanpa pesan error nyangkut.
+      state.token = null;
+      state.user = null;
+      state.sesi = null;
+      hapusSesiTersimpan();
+      state.view = 'login';
+      state.error = '';
+    } finally {
+      state.loading = false;
+      render();
+    }
+  })();
+}
+
+initApp();
+mulaiPollingPengantaran();
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function () {
+    navigator.serviceWorker.register('sw.js').catch(function (err) {
+      console.warn('SW register gagal:', err);
+    });
+  });
+}
+</script>
+</body>
+</html>
