@@ -276,7 +276,6 @@ const state = {
   // TAHAP UI/UX SAJA (pola sama Promosi) - data dummy lokal, belum ada endpoint
   // apiListPengantaranOnline dkk di backend, murni buat tunjukin alur layar.
   pengantaranList: [],
-  pengantaranError: '', // BARU - beda dari 'Belum ada pesanan' asli, ini nandain fetch API-nya gagal (server error/URL Web App belum di-deploy ulang/dst), diisi refreshPengantaranListSilent()
   pengantaranFilter: 'DIPROSES', // DIPROSES | DIANTAR | SELESAI
   pengantaranAktif: null,        // pesanan yang sedang dibuka/diantar
   pengantaranFoto: null,         // dataURL foto bukti hasil AMBIL FOTO/GALERI
@@ -484,16 +483,6 @@ function pengBadge(status) {
 function pengCari(id) {
   return state.pengantaranList.filter(function (p) { return p.Id === id; })[0] || null;
 }
-// Badge status bayar buat kurir - LUNAS (ijo), BELUM_LUNAS/COD (merah, wajib tagih),
-// default BELUM_DIKETAHUI (abu2) kalau backend belum kirim kolom StatusBayar-nya.
-function pengBadgeBayar(statusBayar) {
-  const map = {
-    LUNAS: { text: '✓ LUNAS', cls: 'success' },
-    BELUM_LUNAS: { text: '✗ BELUM BAYAR - COD', cls: 'danger' },
-    COD: { text: '✗ BELUM BAYAR - COD', cls: 'danger' }
-  };
-  return map[statusBayar] || { text: '? Cek Status Bayar', cls: 'neutral' };
-}
 
 // Ubah 1 baris respons server (Kode/Items/FotoUrl/dst - lihat PesananOnlineModel.js)
 // jadi bentuk yang dipakai render view di bawah (Id/Waktu/Produk/Foto - field lama,
@@ -515,10 +504,7 @@ function pengMapDariServer(row) {
     Foto: row.FotoUrl || null,
     CatatanSelesai: row.CatatanSelesai || '',
     WaktuSelesai: row.WaktuSelesai ? fmtWaktu(row.WaktuSelesai) : '',
-    PetugasNama: row.PetugasNama || '',
-    // Status bayar - field baru dari server (row.StatusBayar), belum ada di backend lama
-    // makanya di-fallback 'BELUM_DIKETAHUI' kalau kolom belum dikirim (lihat pengBadgeBayar).
-    StatusBayar: row.StatusBayar || 'BELUM_DIKETAHUI'
+    PetugasNama: row.PetugasNama || ''
   };
 }
 
@@ -533,32 +519,8 @@ function refreshPengantaranListSilent() {
   const viewSaatDipanggil = state.view;
   api('apiListPengantaranUntukPetugas', { token: state.token }).then(function (data) {
     state.pengantaranList = (data || []).map(pengMapDariServer);
-    state.pengantaranError = '';
     if (state.view === viewSaatDipanggil || state.view === 'home') render();
-  }).catch(function (e) {
-    // BEDA dari sebelumnya (diem total) - list cache lama TETAP dipakai (tidak dihapus),
-    // tapi kalau memang lagi kosong (cache lama pun kosong), tandai pengantaranError
-    // supaya layar bisa bedain "beneran belum ada pesanan" vs "gagal ambil data" (mis.
-    // Web App belum di-deploy ulang setelah update kode - lihat catatan Controller.js).
-    state.pengantaranError = (e && e.message) || 'Gagal memuat data pengantaran.';
-    if (state.view === viewSaatDipanggil || state.view === 'home') render();
-  });
-}
-
-// BARU - polling ringan Pengantaran Online: sebelumnya list HANYA diambil sekali saat
-// initApp()/buka menu, jadi kalau kurir lagi diam di layar Home/Pengantaran pas kasir
-// proses pesanan baru di POS Desktop, gak ada yang nongol sampai kurir keluar-masuk menu
-// manual. Interval ini jalan terus di background (dipanggil sekali di bawah initApp()),
-// TAPI cuma benar-benar nembak API kalau kondisinya relevan (sudah login DAN sedang di
-// layar yang nampilin data Pengantaran) - supaya tidak boros baterai/kuota pas kurir lagi
-// buka layar lain (mis. Stock Opname).
-const PENGANTARAN_POLL_MS = 20000;
-function mulaiPollingPengantaran() {
-  setInterval(function () {
-    const viewRelevan = ['home', 'pengantaran', 'pengantaran-detail'];
-    if (!state.token || viewRelevan.indexOf(state.view) === -1) return;
-    refreshPengantaranListSilent();
-  }, PENGANTARAN_POLL_MS);
+  }).catch(function () { /* diam - list cache lama tetap dipakai */ });
 }
 
 function bukaPengantaranDetail(id) {
@@ -1163,7 +1125,6 @@ const VIEWS = {
     const rows = state.pengantaranList.filter(function (p) { return p.Status === state.pengantaranFilter; });
     const cards = rows.map(function (p) {
       const b = pengBadge(p.Status);
-      const bBayar = pengBadgeBayar(p.StatusBayar);
       return '<div class="card">' +
         '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;">' +
           '<div><div style="font-weight:800;font-size:14.5px;">' + esc(p.Id) + '</div>' +
@@ -1173,7 +1134,6 @@ const VIEWS = {
         '<div class="row"><span class="lbl">Pelanggan</span><span class="val">' + esc(p.Pelanggan) + '</span></div>' +
         '<div class="row"><span class="lbl">Alamat</span><span class="val" style="text-align:right;max-width:210px;">' + esc(p.Alamat) + '</span></div>' +
         '<div class="row"><span class="lbl">Produk</span><span class="val">' + p.Produk.length + ' produk • ' + pengUang(p.Total) + '</span></div>' +
-        '<div class="row"><span class="lbl">Bayar</span><span class="badge ' + bBayar.cls + '" style="font-size:11px;">' + bBayar.text + '</span></div>' +
         '<div style="margin-top:10px;">' +
           '<button class="btn btn-primary" data-act="pilih-pengantaran" data-id="' + esc(p.Id) + '">Pilih Pesanan</button>' +
         '</div>' +
@@ -1188,33 +1148,19 @@ const VIEWS = {
           return '<button class="chip' + (state.pengantaranFilter === t ? ' active' : '') + '" data-act="filter-pengantaran" data-f="' + t + '">' + t.charAt(0) + t.slice(1).toLowerCase() + ' (' + n + ')</button>';
         }).join('') +
       '</div>' +
-      (cards || (
-        (state.pengantaranError && state.pengantaranList.length === 0)
-          ? '<div class="empty-state" style="color:hsl(var(--red));">⚠ ' + esc(state.pengantaranError) +
-            '<div style="margin-top:10px;"><button class="btn btn-primary" data-act="retry-pengantaran">Coba Lagi</button></div></div>'
-          : '<div class="empty-state">Belum ada pesanan ' + state.pengantaranFilter.toLowerCase() + '.</div>'
-      )) +
+      (cards || '<div class="empty-state">Belum ada pesanan ' + state.pengantaranFilter.toLowerCase() + '.</div>') +
     '</div>';
   },
 
   'pengantaran-detail': function () {
     const p = state.pengantaranAktif;
     const b = pengBadge(p.Status);
-    const bBayar = pengBadgeBayar(p.StatusBayar);
-    const belumLunas = (p.StatusBayar === 'BELUM_LUNAS' || p.StatusBayar === 'COD');
     const rowsProduk = p.Produk.map(function (i) {
       return '<div class="row"><span class="lbl">' + esc(i.n) + ' x' + i.qty + '</span><span class="val">' + pengUang(i.qty * i.harga) + '</span></div>';
     }).join('');
     return '' +
     '<div class="topbar"><button class="ic-btn" data-act="back-to-pengantaran-list">←</button><h1>Detail Pesanan</h1><div style="width:34px;"></div></div>' +
     '<div class="content">' +
-      '<div class="card" style="border:2px solid ' + (belumLunas ? 'var(--danger)' : 'transparent') + ';">' +
-        '<div style="display:flex;justify-content:space-between;align-items:center;">' +
-          '<div style="font-weight:800;font-size:13.5px;">Status Pembayaran</div>' +
-          '<span class="badge ' + bBayar.cls + '">' + bBayar.text + '</span>' +
-        '</div>' +
-        (belumLunas ? '<div class="row" style="margin-top:8px;"><span class="lbl" style="font-weight:800;">Tagih ke pelanggan</span><span class="val" style="font-weight:800;color:#B91C1C;">' + pengUang(p.Total) + '</span></div>' : '') +
-      '</div>' +
       '<div class="card">' +
         '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;">' +
           '<div style="font-weight:800;font-size:15.5px;">' + esc(p.Id) + '</div>' +
@@ -1920,7 +1866,6 @@ function handleAction(act, el) {
   if (act === 'goto-penerimaan') { bukaPenerimaanList(); return; }
   if (act === 'goto-pengantaran') { bukaPengantaranList(); return; }
   if (act === 'filter-pengantaran') { state.pengantaranFilter = el.getAttribute('data-f'); render(); return; }
-  if (act === 'retry-pengantaran') { refreshPengantaranListSilent(); return; }
   if (act === 'pilih-pengantaran') { bukaPengantaranDetail(el.getAttribute('data-id')); return; }
   if (act === 'back-to-pengantaran-list') { bukaPengantaranList(); return; }
   if (act === 'mulai-pengantaran') { mulaiPengantaran(); return; }
@@ -2087,7 +2032,6 @@ function initApp() {
 }
 
 initApp();
-mulaiPollingPengantaran();
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', function () {
