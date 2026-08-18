@@ -519,17 +519,22 @@ function pengMapDariServer(row) {
     // Status bayar - field baru dari server (row.StatusBayar), belum ada di backend lama
     // makanya di-fallback 'BELUM_DIKETAHUI' kalau kolom belum dikirim (lihat pengBadgeBayar).
     StatusBayar: row.StatusBayar || 'BELUM_DIKETAHUI',
-    // BARU - tag Ambil di Toko vs Diantar ke Rumah, tampil di 1 list yang sama (lihat
-    // pengTipeInfo). Fallback ANTAR kalau kolom row.TipePesanan belum ada di backend
-    // (PesananOnlineModel.js) - pesanan lama semua kebaca ANTAR seperti sebelumnya.
-    TipePesanan: row.TipePesanan === 'AMBIL_SENDIRI' ? 'AMBIL_SENDIRI' : 'ANTAR'
+    // Tag Ambil di Toko vs Diantar ke Rumah, tampil di 1 list yang sama (lihat
+    // pengBadgeTipe). Kolom asli backend: row.Tipe, isinya 'Delivery' (default) atau
+    // 'Pickup' (PesananOnlineModel.js/_resolveTipe - Service SELALU normalisasi jadi
+    // salah satu dari dua ini, jadi fallback di sini cuma jaga-jaga baris lama/kosong).
+    Tipe: row.Tipe === 'Pickup' ? 'Pickup' : 'Delivery'
   };
 }
-// Label & ikon per tipe pesanan - cuma dipakai buat tag/badge di kartu & detail, biar
-// petugas bisa bedain sekilas mana yang diantar ke rumah vs diambil sendiri di toko.
-// Alur layar (Mulai -> Ambil Foto -> Selesaikan) SAMA buat kedua tipe, tidak dibedakan.
-function pengTipeInfo(tipe) {
-  return tipe === 'AMBIL_SENDIRI'
+// Tag & ikon per Tipe pesanan (row.Tipe backend: 'Delivery'/'Pickup') - dipakai
+// kartu list & detail biar petugas bisa bedain sekilas mana yang harus diantar ke
+// rumah vs tinggal disiapkan buat diambil pelanggan di toko (PERUBAHAN Agustus 2026,
+// lihat komentar PesananOnlineService.listUntukPetugas - Pickup sekarang ikut tampil
+// di app mobile ini, sebelumnya disaring keluar). Alur layar (Mulai -> Ambil Foto ->
+// Selesaikan) SAMA buat kedua Tipe, tidak dibedakan - backend (selesaikanAntar) tetap
+// wajib foto & tetap lewat status DIANTAR buat keduanya, jadi UI tidak boleh skip step.
+function pengBadgeTipe(tipe) {
+  return tipe === 'Pickup'
     ? { label: 'Ambil di Toko', icon: '🏬' }
     : { label: 'Diantar ke Rumah', icon: '🛵' };
 }
@@ -1176,7 +1181,7 @@ const VIEWS = {
     const cards = rows.map(function (p) {
       const b = pengBadge(p.Status);
       const bBayar = pengBadgeBayar(p.StatusBayar);
-      const tipe = pengTipeInfo(p.TipePesanan);
+      const tipe = pengBadgeTipe(p.Tipe);
       return '<div class="card">' +
         '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;">' +
           '<div><div style="font-weight:800;font-size:14.5px;">' + esc(p.Id) + '</div>' +
@@ -1214,7 +1219,7 @@ const VIEWS = {
     const p = state.pengantaranAktif;
     const b = pengBadge(p.Status);
     const bBayar = pengBadgeBayar(p.StatusBayar);
-    const info = pengTipeInfo(p.TipePesanan);
+    const info = pengBadgeTipe(p.Tipe);
     const belumLunas = (p.StatusBayar === 'BELUM_LUNAS' || p.StatusBayar === 'COD');
     const rowsProduk = p.Produk.map(function (i) {
       return '<div class="row"><span class="lbl">' + esc(i.n) + ' x' + i.qty + '</span><span class="val">' + pengUang(i.qty * i.harga) + '</span></div>';
