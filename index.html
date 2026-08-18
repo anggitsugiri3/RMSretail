@@ -688,22 +688,14 @@ async function guarded(fn) {
 }
 
 // ---- Persist sesi login & halaman terakhir (localStorage) ---------------
-// Supaya app tidak balik ke halaman Login tiap kali di-refresh atau dibuka
-// ulang - token, user, dan halaman terakhir disimpan di localStorage lalu
-// dipulihkan saat app dimuat (lihat initApp()).
+// PERBAIKAN: sesi login SENGAJA tidak lagi disimpan - tiap refresh/buka ulang
+// app harus login lagi. simpanSesiTerakhir() dibiarkan no-op (bukan dihapus)
+// supaya semua pemanggil (goto(), doLogin(), initApp(), dst) tetap aman jalan
+// tanpa perlu diubah satu-satu.
 const SESSION_KEY = 'soPetugasSession';
 
 function simpanSesiTerakhir() {
-  if (!state.token) return;
-  try {
-    localStorage.setItem(SESSION_KEY, JSON.stringify({
-      token: state.token,
-      user: state.user,
-      view: state.view,
-      sesiId: state.sesi ? state.sesi.Id : null,
-      listOrigin: state.listOrigin
-    }));
-  } catch (e) { /* localStorage tidak tersedia - abaikan, cukup fallback ke login */ }
+  // no-op - lihat catatan PERBAIKAN di atas.
 }
 
 function hapusSesiTersimpan() {
@@ -2029,6 +2021,10 @@ function handleAction(act, el) {
 // Login). Kalau token sudah kadaluarsa/invalid di server, otomatis fallback
 // ke Login (tanpa nyangkut/nge-blank).
 function initApp() {
+  // PERBAIKAN: sesi login tidak lagi dipulihkan - selalu mulai dari Login.
+  // hapusSesiTersimpan() jaga-jaga bersihin sisa data lama (kalau perangkat
+  // masih nyimpen SESSION_KEY dari versi app sebelum perbaikan ini).
+  hapusSesiTersimpan();
   const saved = bacaSesiTersimpan();
   if (!saved || !saved.token) { render(); return; }
 
