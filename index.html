@@ -227,7 +227,7 @@
  * ========================================================================= */
 
 // GANTI dengan URL deployment GAS (`/exec`) proyek utama sebelum dipakai produksi.
-const BACKEND_URL = 'https://script.google.com/macros/s/AKfycbxlyManslLRkZdiuxkHGcQCJa3Efpgqc_Zn1vFfdPqtmkzRFOvoby8hcGOB4LfHQjGK/exec';
+const BACKEND_URL = 'https://script.google.com/macros/s/AKfycbzFdeVxWbxRuilpssm1k0oHuTJ_8WcUjFVpMrxkCIS0mGMka3Y83UjCHwb8cYxsc8RP/exec';
 
 // Pengantaran Online sekarang tersambung ke backend sungguhan (PesananOnlineController.js,
 // lewat doPost - lihat apiListPengantaranUntukPetugas/apiMulaiPengantaran/
@@ -518,8 +518,20 @@ function pengMapDariServer(row) {
     PetugasNama: row.PetugasNama || '',
     // Status bayar - field baru dari server (row.StatusBayar), belum ada di backend lama
     // makanya di-fallback 'BELUM_DIKETAHUI' kalau kolom belum dikirim (lihat pengBadgeBayar).
-    StatusBayar: row.StatusBayar || 'BELUM_DIKETAHUI'
+    StatusBayar: row.StatusBayar || 'BELUM_DIKETAHUI',
+    // BARU - tag Ambil di Toko vs Diantar ke Rumah, tampil di 1 list yang sama (lihat
+    // pengTipeInfo). Fallback ANTAR kalau kolom row.TipePesanan belum ada di backend
+    // (PesananOnlineModel.js) - pesanan lama semua kebaca ANTAR seperti sebelumnya.
+    TipePesanan: row.TipePesanan === 'AMBIL_SENDIRI' ? 'AMBIL_SENDIRI' : 'ANTAR'
   };
+}
+// Label & ikon per tipe pesanan - cuma dipakai buat tag/badge di kartu & detail, biar
+// petugas bisa bedain sekilas mana yang diantar ke rumah vs diambil sendiri di toko.
+// Alur layar (Mulai -> Ambil Foto -> Selesaikan) SAMA buat kedua tipe, tidak dibedakan.
+function pengTipeInfo(tipe) {
+  return tipe === 'AMBIL_SENDIRI'
+    ? { label: 'Ambil di Toko', icon: '🏬' }
+    : { label: 'Diantar ke Rumah', icon: '🛵' };
 }
 
 // Pola sama persis bukaPenerimaanList: pindah layar pakai cache dulu (kalau ada), refresh
@@ -1164,10 +1176,11 @@ const VIEWS = {
     const cards = rows.map(function (p) {
       const b = pengBadge(p.Status);
       const bBayar = pengBadgeBayar(p.StatusBayar);
+      const tipe = pengTipeInfo(p.TipePesanan);
       return '<div class="card">' +
         '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;">' +
           '<div><div style="font-weight:800;font-size:14.5px;">' + esc(p.Id) + '</div>' +
-          '<div class="lbl" style="margin-top:2px;">' + esc(p.Waktu) + '</div></div>' +
+          '<div class="lbl" style="margin-top:2px;">' + esc(p.Waktu) + ' • ' + tipe.icon + ' ' + tipe.label + '</div></div>' +
           '<span class="badge ' + b.cls + '">' + b.text + '</span>' +
         '</div>' +
         '<div class="row"><span class="lbl">Pelanggan</span><span class="val">' + esc(p.Pelanggan) + '</span></div>' +
@@ -1201,6 +1214,7 @@ const VIEWS = {
     const p = state.pengantaranAktif;
     const b = pengBadge(p.Status);
     const bBayar = pengBadgeBayar(p.StatusBayar);
+    const info = pengTipeInfo(p.TipePesanan);
     const belumLunas = (p.StatusBayar === 'BELUM_LUNAS' || p.StatusBayar === 'COD');
     const rowsProduk = p.Produk.map(function (i) {
       return '<div class="row"><span class="lbl">' + esc(i.n) + ' x' + i.qty + '</span><span class="val">' + pengUang(i.qty * i.harga) + '</span></div>';
@@ -1217,7 +1231,8 @@ const VIEWS = {
       '</div>' +
       '<div class="card">' +
         '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;">' +
-          '<div style="font-weight:800;font-size:15.5px;">' + esc(p.Id) + '</div>' +
+          '<div><div style="font-weight:800;font-size:15.5px;">' + esc(p.Id) + '</div>' +
+          '<span class="badge neutral" style="margin-top:6px;">' + info.icon + ' ' + info.label + '</span></div>' +
           '<span class="badge ' + b.cls + '">' + b.text + '</span>' +
         '</div>' +
         '<div class="row"><span class="lbl">Pelanggan</span><span class="val">' + esc(p.Pelanggan) + '</span></div>' +
