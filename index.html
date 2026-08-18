@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
-<title>Retail Management System</title>
+<title>A'ini ERP — Stock Opname Petugas</title>
 <link rel="manifest" href="manifest.json" />
 <link rel="apple-touch-icon" href="apple-touch-icon.png" />
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png" />
@@ -11,7 +11,7 @@
 <meta name="mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-<meta name="apple-mobile-web-app-title" content="RMS" />
+<meta name="apple-mobile-web-app-title" content="A'ini Petugas" />
 <style>
   :root{
     --primary:#2F6FED; --primary-hover:#1E5BDB; --primary-tint:#EAF1FE;
@@ -40,9 +40,6 @@
   .topbar .ic-btn{width:34px;height:34px;border-radius:10px;border:1px solid var(--border);background:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;flex:0 0 auto;font-size:16px;color:var(--gray-700);}
   .topbar .ic-btn:active{background:#F3F4F6;}
   .topbar h1{font-size:16px;font-weight:700;margin:0;flex:1;}
-  .topbar-brand{display:flex;align-items:center;gap:8px;flex:1;min-width:0;}
-  .topbar-brand svg{flex:0 0 auto;}
-  .topbar-brand .name{font-size:14.5px;font-weight:800;letter-spacing:.15px;color:var(--primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .content{flex:1;padding:16px;padding-bottom:100px;overflow-y:auto;}
   .center-content{flex:1;display:flex;flex-direction:column;justify-content:center;padding:28px 24px;}
 
@@ -208,12 +205,8 @@
  *   (status Draft, Items:[])
  * apiGetPenerimaanDetail(token,penerimaanId) -> header + Items, buat resume draft
  * apiCariProdukBarcode(token,barcode) -> produk {ProdukId,Nama,Barcode,HargaBeli}
- *   atau null kalau belum terdaftar (fallback ini dipakai kalau katalog belum disinkron)
- * apiListProdukUntukPenerimaan(token) -> [{ProdukId,Nama,Barcode,HargaBeli}, ...]
- *   SEMUA produk yang punya barcode - dipakai tombol "Sinkron" di daftar Penerimaan
- *   Barang, di-cache di memori (state.produkCache) supaya scan barcode berikutnya
- *   instan tanpa round-trip ke server tiap kali (biar proses penerimaan cepat)
- * apiBuatProdukBaru(token,barcode,nama,kategori,satuan,hargaBeli,stokAwal) -> produk baru
+ *   atau null kalau belum terdaftar
+ * apiBuatProdukBaru(token,barcode,nama,kategori,hargaBeli) -> produk baru
  * apiSimpanItemPenerimaan(token,penerimaanId,produkId,qty) -> Items terbaru
  *   (insert kalau produk belum ada di daftar, replace qty kalau sudah)
  * apiSelesaikanPenerimaanBarang(token,penerimaanId) -> header final (Status Selesai)
@@ -228,11 +221,6 @@
 
 // GANTI dengan URL deployment GAS (`/exec`) proyek utama sebelum dipakai produksi.
 const BACKEND_URL = 'https://script.google.com/macros/s/AKfycbxlyManslLRkZdiuxkHGcQCJa3Efpgqc_Zn1vFfdPqtmkzRFOvoby8hcGOB4LfHQjGK/exec';
-
-// Pengantaran Online sekarang tersambung ke backend sungguhan (PesananOnlineController.js,
-// lewat doPost - lihat apiListPengantaranUntukPetugas/apiMulaiPengantaran/
-// apiSelesaikanPengantaranOnline di bagian bawah). Bukan dummy lagi - state.pengantaranList
-// diisi dari server oleh refreshPengantaranListSilent()/initApp(), lihat pengMapDariServer().
 
 const state = {
   token: null,
@@ -265,21 +253,15 @@ const state = {
   produkPenerimaanAktif: null, // produk yang lagi diisi qty-nya
   qtyPenerimaanInput: 0,
   barcodeBaru: '',           // barcode hasil scan yang belum terdaftar di produk
-  // Katalog produk (barcode -> produk) hasil Sinkron - dipakai supaya scan barcode
-  // saat Penerimaan Barang tidak perlu request ke server tiap kali (instan, dari cache
-  // lokal). null = belum pernah sinkron (fallback ke cek server tiap scan seperti biasa).
-  produkCache: null,
-  produkCacheAt: null,
-  produkCacheCount: 0,
 
-  // ---- Pengantaran Online (§ tampilan mobile petugas kurir) --------------
-  // TAHAP UI/UX SAJA (pola sama Promosi) - data dummy lokal, belum ada endpoint
-  // apiListPengantaranOnline dkk di backend, murni buat tunjukin alur layar.
+  // ---- Pengantaran Online -------------------------------------------------
+  // Data pesanan dari Sheet_PesananOnline (PesananOnlineController/Service.js) - dibuat
+  // customer/kasir POS, di sini Petugas cuma MENGERJAKAN (DIPROSES->DIANTAR->SELESAI),
+  // bukan bikin baru. TIDAK ada state lokal/localStorage - selalu dari server.
   pengantaranList: [],
-  pengantaranFilter: 'DIPROSES', // DIPROSES | DIANTAR | SELESAI
-  pengantaranAktif: null,        // pesanan yang sedang dibuka/diantar
-  pengantaranFoto: null,         // dataURL foto bukti hasil AMBIL FOTO/GALERI
-  pengantaranCatatan: ''
+  pengantaranFilter: 'SEMUA', // SEMUA | DIPROSES | DIANTAR | SELESAI
+  pengantaranAktif: null,     // pesanan yang sedang dibuka di layar Detail
+  fotoBuktiPengantaran: ''    // data URL foto bukti (layar Selesaikan Pengantaran)
 };
 
 // ---- Scan Barcode kamera (ZXing) -----------------------------------------
@@ -460,6 +442,27 @@ function fmtWaktu(d) {
   const dt = new Date(d);
   return fmtTanggal(d) + ' ' + String(dt.getHours()).padStart(2, '0') + ':' + String(dt.getMinutes()).padStart(2, '0');
 }
+// ---- Badge helper Pengantaran Online (label/warna SAMA persis konvensi POS Desktop
+// PesananOnline.html, biar istilah yang dilihat kasir & petugas konsisten) ----------
+function pengStatusBadge(status) {
+  const map = {
+    DIPROSES: { text: 'Diproses', cls: 'warning' },
+    DIANTAR: { text: 'Diantar', cls: 'info' },
+    SELESAI: { text: 'Selesai', cls: 'success' }
+  };
+  return map[status] || { text: status, cls: 'neutral' };
+}
+function pengTipeInfo(tipe) {
+  return tipe === 'Pickup' ? { text: 'Ambil di Toko', icon: '🏬' } : { text: 'Diantar ke Alamat', icon: '🛵' };
+}
+function pengBayarBadge(statusBayar) {
+  const map = {
+    LUNAS: { text: 'Lunas', cls: 'success' },
+    BELUM_LUNAS: { text: 'Belum Lunas', cls: 'danger' },
+    COD: { text: 'Bayar di Tempat', cls: 'neutral' }
+  };
+  return map[statusBayar] || { text: statusBayar || '-', cls: 'neutral' };
+}
 function statusBadge(statusLabel) {
   const map = {
     MENUNGGU_PETUGAS: { text: 'Menunggu Petugas', cls: 'warning' },
@@ -468,138 +471,6 @@ function statusBadge(statusLabel) {
     SUDAH_FINAL: { text: 'Sudah Final (Disesuaikan)', cls: 'neutral' }
   };
   return map[statusLabel] || { text: statusLabel, cls: 'neutral' };
-}
-
-// ---- Pengantaran Online: helpers & actions --------------------------------
-function pengUang(n) { return 'Rp' + Number(n || 0).toLocaleString('id-ID'); }
-function pengBadge(status) {
-  const map = {
-    DIPROSES: { text: 'DIPROSES', cls: 'warning' },
-    DIANTAR: { text: 'DIANTAR', cls: 'info' },
-    SELESAI: { text: 'SELESAI', cls: 'success' }
-  };
-  return map[status] || { text: status, cls: 'neutral' };
-}
-function pengCari(id) {
-  return state.pengantaranList.filter(function (p) { return p.Id === id; })[0] || null;
-}
-// BARU: pesanan Tipe='Pickup' (Ambil di Toko) sekarang IKUT muncul di app mobile
-// Pengantaran (backend tidak lagi menyaringnya keluar - lihat listUntukPetugas()
-// PesananOnlineService.js), badge ini biar Petugas tetap bisa bedakan mana yang
-// benar-benar harus diantar ke alamat vs mana yang tinggal disiapkan buat diambil
-// pelanggan sendiri di toko.
-function pengBadgeTipe(tipe) {
-  const isPickup = String(tipe || '').trim().toLowerCase() === 'pickup';
-  return isPickup
-    ? { text: 'Ambil di Toko', cls: 'neutral' }
-    : { text: 'Diantar', cls: 'info' };
-}
-
-// Ubah 1 baris respons server (Kode/Items/FotoUrl/dst - lihat PesananOnlineModel.js)
-// jadi bentuk yang dipakai render view di bawah (Id/Waktu/Produk/Foto - field lama,
-// TIDAK diubah supaya diff minimal). `_rowId` (Id UUID asli) disimpan terpisah, dipakai
-// manggil apiMulaiPengantaran/apiSelesaikanPengantaranOnline - p.Id yang tampil ke user
-// & jadi kunci pengCari() sekarang = Kode (mis. "ONL-20260806-ab12"), BUKAN Id server.
-function pengMapDariServer(row) {
-  return {
-    Id: row.Kode,
-    _rowId: row.Id,
-    Waktu: fmtWaktu(row.CreatedAt),
-    Status: row.Status,
-    Tipe: row.Tipe || 'Delivery',
-    IsPickup: String(row.Tipe || '').trim().toLowerCase() === 'pickup',
-    Pelanggan: row.Pelanggan,
-    Kontak: row.Kontak,
-    Alamat: row.Alamat,
-    Catatan: row.Catatan,
-    Produk: (row.Items || []).map(function (it) { return { n: it.nama, qty: it.qty, harga: it.harga }; }),
-    Total: row.Total,
-    Foto: row.FotoUrl || null,
-    CatatanSelesai: row.CatatanSelesai || '',
-    WaktuSelesai: row.WaktuSelesai ? fmtWaktu(row.WaktuSelesai) : '',
-    PetugasNama: row.PetugasNama || ''
-  };
-}
-
-// Pola sama persis bukaPenerimaanList: pindah layar pakai cache dulu (kalau ada), refresh
-// diam-diam di belakang - tidak nunggu network buat buka menu.
-function bukaPengantaranList() {
-  state.pengantaranFilter = 'DIPROSES';
-  goto('pengantaran');
-  refreshPengantaranListSilent();
-}
-function refreshPengantaranListSilent() {
-  const viewSaatDipanggil = state.view;
-  api('apiListPengantaranUntukPetugas', { token: state.token }).then(function (data) {
-    state.pengantaranList = (data || []).map(pengMapDariServer);
-    if (state.view === viewSaatDipanggil || state.view === 'home') render();
-  }).catch(function () { /* diam - list cache lama tetap dipakai */ });
-}
-
-function bukaPengantaranDetail(id) {
-  state.pengantaranAktif = pengCari(id);
-  goto('pengantaran-detail');
-}
-
-// Status DIPROSES -> DIANTAR sungguhan di server (apiMulaiPengantaran) - begitu berhasil,
-// POS Desktop yang lagi buka panel Ringkasan langsung lihat status DIANTAR di polling
-// berikutnya (lihat POSPage_startPollingPesananOnline di POS.html).
-function mulaiPengantaran() {
-  guarded(async function () {
-    const p = state.pengantaranAktif;
-    const updated = await api('apiMulaiPengantaran', { token: state.token, id: p._rowId });
-    state.pengantaranAktif = pengMapDariServer(updated);
-    state.pengantaranFoto = state.pengantaranAktif.Foto;
-    showToast(state.pengantaranAktif.IsPickup ? 'Pesanan ' + p.Id + ' siap diserahkan.' : 'Pengantaran dimulai untuk ' + p.Id + '.');
-    goto('pengantaran-foto');
-  });
-}
-
-function pilihFotoPengantaran(file) {
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = function (e) {
-    state.pengantaranFoto = e.target.result;
-    render();
-  };
-  reader.readAsDataURL(file);
-}
-
-function lanjutSelesaikanPengantaran() {
-  if (!state.pengantaranFoto) {
-    state.error = state.pengantaranAktif && state.pengantaranAktif.IsPickup
-      ? 'Ambil foto bukti serah terima dulu.'
-      : 'Ambil foto bukti pengantaran dulu.';
-    render(); return;
-  }
-  state.error = '';
-  state.pengantaranCatatan = '';
-  goto('pengantaran-selesai');
-}
-
-// Status DIANTAR -> SELESAI sungguhan di server (apiSelesaikanPengantaranOnline) - foto
-// (data URL base64 dari kamera/galeri HP) diupload ke Drive di sisi server, URL-nya
-// disimpan ke kolom FotoUrl. Titik inilah yang bikin POS Desktop lihat status Selesai +
-// detail (foto/catatan/waktu) tanpa langkah manual apapun di sisi kasir.
-function selesaikanPengantaran() {
-  guarded(async function () {
-    const p = state.pengantaranAktif;
-    const catatan = document.getElementById('in-catatan-selesai')
-      ? document.getElementById('in-catatan-selesai').value.trim()
-      : state.pengantaranCatatan;
-    const updated = await api('apiSelesaikanPengantaranOnline', {
-      token: state.token, id: p._rowId, fotoBase64: state.pengantaranFoto, catatan: catatan
-    });
-    const mapped = pengMapDariServer(updated);
-    // Sinkron balik ke pengantaranList lokal (bukan cuma pengantaranAktif) supaya tab
-    // SELESAI di layar daftar langsung benar tanpa nunggu refresh berikutnya.
-    const idx = state.pengantaranList.findIndex(function (x) { return x.Id === mapped.Id; });
-    if (idx !== -1) state.pengantaranList[idx] = mapped; else state.pengantaranList.push(mapped);
-    state.pengantaranAktif = mapped;
-    showToast(mapped.IsPickup ? 'Pesanan ' + mapped.Id + ' selesai diserahkan ✓' : 'Pesanan ' + mapped.Id + ' selesai diantar ✓');
-    state.pengantaranFilter = 'SELESAI';
-    goto('pengantaran');
-  });
 }
 
 // Indikator Pengeditan (badge "Diedit X/2 Kali") - MAX_REVISI ikut backend existing
@@ -749,34 +620,8 @@ function bukaPenerimaanDraft(id) {
   });
 }
 
-// Download SEMUA produk (barcode -> data produk) sekali, simpan di memori (state.produkCache).
-// Setelah ini, scan barcode saat Penerimaan Barang tidak perlu tunggu network lagi -
-// tinggal cek ke cache lokal, jadi jauh lebih cepat (langsung ke layar Qty tanpa delay).
-function sinkronKatalogProduk() {
-  guarded(async function () {
-    const list = await api('apiListProdukUntukPenerimaan', { token: state.token });
-    const map = {};
-    (list || []).forEach(function (p) { if (p.Barcode) map[p.Barcode] = p; });
-    state.produkCache = map;
-    state.produkCacheAt = new Date();
-    state.produkCacheCount = (list || []).length;
-    showToast('Katalog tersinkron: ' + state.produkCacheCount + ' produk.');
-  });
-}
-
 // Dipanggil begitu barcode kebaca kamera saat di layar scan Penerimaan.
 function cariProdukPenerimaan(barcode) {
-  // Sudah pernah Sinkron Katalog -> cek ke cache lokal dulu, TANPA request ke server.
-  // Instan: kalau ketemu langsung ke layar Qty, kalau tidak ketemu langsung dianggap
-  // produk baru (karena katalog sudah lengkap, tidak perlu double-check ke server lagi).
-  if (state.produkCache) {
-    const produk = state.produkCache[barcode];
-    if (produk) { bukaQtyPenerimaan(produk); return; }
-    state.barcodeBaru = barcode;
-    goto('penerimaan-produk-baru');
-    return;
-  }
-  // Belum pernah Sinkron Katalog - fallback ke cara lama (cek ke server tiap scan).
   guarded(async function () {
     const produk = await api('apiCariProdukBarcode', { token: state.token, barcode: barcode });
     if (produk) {
@@ -815,11 +660,8 @@ function simpanQtyPenerimaan() {
 function submitProdukBaruPenerimaan(nama, kategori, satuan, hargaBeli) {
   guarded(async function () {
     const produk = await api('apiBuatProdukBaru', {
-      token: state.token, barcode: state.barcodeBaru, nama: nama, kategori: kategori, satuan: satuan, hargaBeli: hargaBeli, stokAwal: 0
+      token: state.token, barcode: state.barcodeBaru, nama: nama, kategori: kategori, satuan: satuan, hargaBeli: hargaBeli
     });
-    // Masukkan juga ke cache lokal (kalau sudah pernah Sinkron Katalog) supaya kalau
-    // barcode yang sama kescan lagi di sesi ini, langsung ketemu tanpa ke server.
-    if (state.produkCache && produk && produk.Barcode) state.produkCache[produk.Barcode] = produk;
     state.barcodeBaru = '';
     bukaQtyPenerimaan(produk);
   });
@@ -847,6 +689,78 @@ function hapusPenerimaan(id) {
   render();
 }
 
+// ---- Pengantaran Online: actions ------------------------------------------
+// Terhubung ke backend asli (PesananOnlineController.js) - pesanan dibuat customer/
+// kasir POS (Status BARU->DIPROSES di sana), muncul di sini begitu Status=DIPROSES.
+// Petugas cuma menjalankan DIPROSES->DIANTAR->SELESAI, TIDAK bisa membuat/menghapus
+// pesanan dari app ini.
+function bukaPengantaranList() {
+  goto('pengantaran-online');
+  refreshPengantaranListSilent();
+}
+
+// Pola sama refreshPenerimaanListSilent: pindah layar duluan pakai cache (kalau ada),
+// refresh diam-diam di belakang - kalau user masih di view yang sama pas hasil balik,
+// baru di-render ulang.
+function refreshPengantaranListSilent() {
+  const viewSaatDipanggil = state.view;
+  api('apiListPengantaranUntukPetugas', { token: state.token }).then(function (data) {
+    state.pengantaranList = data || [];
+    if (state.view === viewSaatDipanggil) render();
+  }).catch(function () { /* diam - list cache lama tetap dipakai */ });
+}
+
+// Badge angka kartu Home - pesanan yang masih butuh dikerjakan petugas (SELESAI
+// tidak dihitung, itu riwayat).
+function pengantaranAktifCount() {
+  return state.pengantaranList.filter(function (p) {
+    return p.Status === 'DIPROSES' || p.Status === 'DIANTAR';
+  }).length;
+}
+
+function bukaPengantaran(id) {
+  const p = state.pengantaranList.filter(function (x) { return String(x.Id) === String(id); })[0];
+  if (!p) return;
+  state.pengantaranAktif = p;
+  state.fotoBuktiPengantaran = '';
+  goto('pengantaran-online-detail');
+}
+
+// Sinkronkan 1 baris hasil update server ke pengantaranAktif + pengantaranList,
+// tanpa perlu narik ulang seluruh daftar dari server.
+function terapkanPengantaranTerbaru(updated) {
+  state.pengantaranAktif = updated;
+  state.pengantaranList = state.pengantaranList.map(function (p) {
+    return String(p.Id) === String(updated.Id) ? updated : p;
+  });
+}
+
+// Tap "Mulai Pengantaran" - Status DIPROSES -> DIANTAR (dicatat server siapa & kapan,
+// bukan dari client - lihat PesananOnlineService.mulaiAntar).
+function mulaiPengantaran() {
+  guarded(async function () {
+    const updated = await api('apiMulaiPengantaran', { token: state.token, id: state.pengantaranAktif.Id });
+    terapkanPengantaranTerbaru(updated);
+    showToast('Pengantaran ' + updated.Kode + ' dimulai.');
+  });
+}
+
+// Selesaikan pengantaran - foto bukti WAJIB (divalidasi juga di server), catatan opsional.
+// Status DIANTAR -> SELESAI. Titik ini yang bikin POS Desktop langsung lihat status
+// Selesai begitu di-refresh.
+function selesaikanPengantaran(catatan) {
+  if (!state.fotoBuktiPengantaran) { state.error = 'Foto bukti pengantaran wajib diisi.'; render(); return; }
+  guarded(async function () {
+    const updated = await api('apiSelesaikanPengantaranOnline', {
+      token: state.token, id: state.pengantaranAktif.Id, fotoBase64: state.fotoBuktiPengantaran, catatan: catatan
+    });
+    state.fotoBuktiPengantaran = '';
+    terapkanPengantaranTerbaru(updated);
+    showToast('Pengantaran ' + updated.Kode + ' selesai.');
+    goto('pengantaran-online-detail');
+  });
+}
+
 // ---- Actions -------------------------------------------------------------
 function doLogin(username, password) {
   guarded(async function () {
@@ -855,6 +769,9 @@ function doLogin(username, password) {
     state.user = data.user;
     await refreshSesiList();
     goto('home');
+    // Non-blocking - badge "Pengantaran Online" di Home cukup nyusul begitu hasilnya
+    // balik, tidak perlu bikin Login kerasa lama nunggu daftar pengantaran juga.
+    refreshPengantaranListSilent();
   });
 }
 
@@ -924,7 +841,7 @@ function simpanKoreksiSelisih() {
     state.selisihItem = updated;
     goto('selisih-list');
     const selBaru = Number(updated.StokFisik) - Number(updated.StokSistem);
-    showToast('Tersimpan. Sistem -, Selisih ' + (selBaru > 0 ? '+' : '') + selBaru + '.');
+    showToast('Tersimpan. Sistem ' + updated.StokSistem + ', Selisih ' + (selBaru > 0 ? '+' : '') + selBaru + '.');
   });
 }
 
@@ -1066,11 +983,11 @@ const VIEWS = {
             '<polyline points="70,66 74,70 82,61" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>' +
           '</svg>' +
         '</div>' +
-        '<div class="login-title" style="font-size:17px;">RETAIL MANAGEMENT SYSTEM</div>' +
+        '<div class="login-title">STOCK OPNAME</div>' +
         '<div class="login-subtitle">Inventory Counting System</div>' +
         '<div class="login-divider"></div>' +
         '<div class="login-welcome">Welcome Back</div>' +
-        '<div class="login-welcome-sub">Please log in to access the Retail Management System</div>' +
+        '<div class="login-welcome-sub">Please log in to access the Stock Opname system</div>' +
         '<div class="field"><label>Username</label><div class="field-icon">' +
           '<span class="ic"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.5-7 8-7s8 3 8 7"/></svg></span>' +
           '<input type="text" id="in-username" placeholder="Enter your username" />' +
@@ -1098,17 +1015,8 @@ const VIEWS = {
   home: function () {
     const sesiMulai = state.sesiList.filter(sesiMasukMulai);
     const sesiEdit = state.sesiList.filter(sesiMasukEdit);
-    const pengDiproses = state.pengantaranList.filter(function (p) { return p.Status === 'DIPROSES'; });
     return '' +
-    '<div class="topbar"><button class="ic-btn" data-act="logout">←</button>' +
-      '<div class="topbar-brand">' +
-        '<svg width="22" height="22" viewBox="0 0 100 100">' +
-          '<polygon points="50,6 90,28 90,72 50,94 10,72 10,28" fill="none" stroke="#1A3A8F" stroke-width="7"/>' +
-          '<polyline points="34,52 45,63 68,38" fill="none" stroke="#22C55E" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>' +
-        '</svg>' +
-        '<span class="name">Retail Management System</span>' +
-      '</div>' +
-      '<button class="ic-btn">☰</button></div>' +
+    '<div class="topbar"><button class="ic-btn" data-act="logout">←</button><h1>A\'ini ERP — Stock Opname</h1><button class="ic-btn">☰</button></div>' +
     '<div class="content">' +
       '<div class="info-box"><div><b>Halo, ' + esc((state.user && state.user.FullName) || 'Petugas') + '</b>Pilih menu di bawah untuk melanjutkan.</div></div>' +
       '<div class="card card-clickable" data-act="goto-penerimaan" style="cursor:pointer;display:flex;align-items:center;gap:14px;">' +
@@ -1118,10 +1026,10 @@ const VIEWS = {
         '<span class="badge neutral">›</span>' +
       '</div>' +
       '<div class="card card-clickable" data-act="goto-pengantaran" style="cursor:pointer;display:flex;align-items:center;gap:14px;">' +
-        '<div class="thumb" style="width:46px;height:46px;border-radius:12px;background:var(--info-tint);display:flex;align-items:center;justify-content:center;font-size:20px;flex:0 0 auto;">🛵</div>' +
+        '<div class="thumb" style="width:46px;height:46px;border-radius:12px;background:var(--warning-tint);display:flex;align-items:center;justify-content:center;font-size:20px;flex:0 0 auto;">🚚</div>' +
         '<div style="flex:1;"><div style="font-weight:800;font-size:15px;">Pengantaran Online</div>' +
-        '<div style="font-size:12px;color:var(--gray-500);margin-top:2px;">Antar pesanan online ke pelanggan</div></div>' +
-        '<span class="badge ' + (pengDiproses.length ? 'warning' : 'neutral') + '">' + pengDiproses.length + '</span>' +
+        '<div style="font-size:12px;color:var(--gray-500);margin-top:2px;">Kelola pengiriman pesanan online</div></div>' +
+        '<span class="badge ' + (pengantaranAktifCount() ? 'warning' : 'neutral') + '">' + pengantaranAktifCount() + '</span>' +
       '</div>' +
       '<div class="card card-clickable" data-act="goto-list-mulai" style="cursor:pointer;display:flex;align-items:center;gap:14px;">' +
         '<div class="thumb" style="width:46px;height:46px;border-radius:12px;background:var(--primary-tint);display:flex;align-items:center;justify-content:center;font-size:20px;flex:0 0 auto;">📋</div>' +
@@ -1135,136 +1043,6 @@ const VIEWS = {
         '<div style="font-size:12px;color:var(--gray-500);margin-top:2px;">Cek dan koreksi selisih sesi yang sudah selesai</div></div>' +
         '<span class="badge ' + (sesiEdit.length ? 'info' : 'neutral') + '">' + sesiEdit.length + '</span>' +
       '</div>' +
-    '</div>';
-  },
-
-  pengantaran: function () {
-    const tabs = ['DIPROSES', 'DIANTAR', 'SELESAI'];
-    const rows = state.pengantaranList.filter(function (p) { return p.Status === state.pengantaranFilter; });
-    const cards = rows.map(function (p) {
-      const b = pengBadge(p.Status);
-      const bt = pengBadgeTipe(p.Tipe);
-      return '<div class="card">' +
-        '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;">' +
-          '<div><div style="font-weight:800;font-size:14.5px;">' + esc(p.Id) + '</div>' +
-          '<div class="lbl" style="margin-top:2px;">' + esc(p.Waktu) + '</div></div>' +
-          '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">' +
-            '<span class="badge ' + b.cls + '">' + b.text + '</span>' +
-            '<span class="badge ' + bt.cls + '">' + bt.text + '</span>' +
-          '</div>' +
-        '</div>' +
-        '<div class="row"><span class="lbl">Pelanggan</span><span class="val">' + esc(p.Pelanggan) + '</span></div>' +
-        (p.Alamat ? '<div class="row"><span class="lbl">Alamat</span><span class="val" style="text-align:right;max-width:210px;">' + esc(p.Alamat) + '</span></div>' : '') +
-        '<div class="row"><span class="lbl">Produk</span><span class="val">' + p.Produk.length + ' produk • ' + pengUang(p.Total) + '</span></div>' +
-        '<div style="margin-top:10px;">' +
-          '<button class="btn btn-primary" data-act="pilih-pengantaran" data-id="' + esc(p.Id) + '">Pilih Pesanan</button>' +
-        '</div>' +
-      '</div>';
-    }).join('');
-    return '' +
-    '<div class="topbar"><button class="ic-btn" data-act="back-to-home">←</button><h1>Pengantaran Online</h1><div style="width:34px;"></div></div>' +
-    '<div class="content">' +
-      '<div class="chip-row">' +
-        tabs.map(function (t) {
-          const n = state.pengantaranList.filter(function (p) { return p.Status === t; }).length;
-          return '<button class="chip' + (state.pengantaranFilter === t ? ' active' : '') + '" data-act="filter-pengantaran" data-f="' + t + '">' + t.charAt(0) + t.slice(1).toLowerCase() + ' (' + n + ')</button>';
-        }).join('') +
-      '</div>' +
-      (cards || '<div class="empty-state">Belum ada pesanan ' + state.pengantaranFilter.toLowerCase() + '.</div>') +
-    '</div>';
-  },
-
-  'pengantaran-detail': function () {
-    const p = state.pengantaranAktif;
-    const b = pengBadge(p.Status);
-    const bt = pengBadgeTipe(p.Tipe);
-    const rowsProduk = p.Produk.map(function (i) {
-      return '<div class="row"><span class="lbl">' + esc(i.n) + ' x' + i.qty + '</span><span class="val">' + pengUang(i.qty * i.harga) + '</span></div>';
-    }).join('');
-    return '' +
-    '<div class="topbar"><button class="ic-btn" data-act="back-to-pengantaran-list">←</button><h1>Detail Pesanan</h1><div style="width:34px;"></div></div>' +
-    '<div class="content">' +
-      '<div class="card">' +
-        '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;">' +
-          '<div style="font-weight:800;font-size:15.5px;">' + esc(p.Id) + '</div>' +
-          '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">' +
-            '<span class="badge ' + b.cls + '">' + b.text + '</span>' +
-            '<span class="badge ' + bt.cls + '">' + bt.text + '</span>' +
-          '</div>' +
-        '</div>' +
-        '<div class="row"><span class="lbl">Pelanggan</span><span class="val">' + esc(p.Pelanggan) + '</span></div>' +
-        '<div class="row"><span class="lbl">Kontak</span><span class="val">' + esc(p.Kontak) + '</span></div>' +
-        (p.Alamat ? '<div class="row"><span class="lbl">Alamat</span><span class="val" style="text-align:right;max-width:210px;">' + esc(p.Alamat) + '</span></div>' : '') +
-        (p.Catatan ? '<div class="row"><span class="lbl">Catatan</span><span class="val" style="text-align:right;max-width:210px;">' + esc(p.Catatan) + '</span></div>' : '') +
-      '</div>' +
-      '<div class="card">' +
-        '<div style="font-weight:800;font-size:13.5px;margin-bottom:8px;">Detail Produk (' + p.Produk.length + ')</div>' +
-        rowsProduk +
-        '<div class="row" style="border-top:1px solid var(--border);margin-top:6px;padding-top:10px;"><span class="lbl" style="font-weight:800;color:var(--gray-900);">Total Pesanan</span><span class="val" style="font-size:15px;">' + pengUang(p.Total) + '</span></div>' +
-      '</div>' +
-      (p.Status === 'SELESAI'
-        ? '<div class="card">' +
-            '<div style="font-weight:800;font-size:13.5px;margin-bottom:10px;">' + (p.IsPickup ? 'Bukti Serah Terima' : 'Bukti Pengantaran') + '</div>' +
-            (p.Foto ? '<img src="' + esc(p.Foto) + '" style="width:100%;border-radius:14px;display:block;max-height:220px;object-fit:cover;margin-bottom:10px;" />' : '') +
-            '<div class="row"><span class="lbl">Selesai oleh</span><span class="val">' + esc(p.PetugasNama || '-') + '</span></div>' +
-            '<div class="row"><span class="lbl">Waktu Selesai</span><span class="val">' + esc(p.WaktuSelesai || '-') + '</span></div>' +
-            (p.CatatanSelesai ? '<div class="row"><span class="lbl">Catatan</span><span class="val" style="text-align:right;max-width:210px;">' + esc(p.CatatanSelesai) + '</span></div>' : '') +
-          '</div>'
-        : '') +
-      '__ERROR__' +
-    '</div>' +
-    (p.Status === 'SELESAI' ? '' :
-    '<div class="footer-fixed">' +
-      (p.Status === 'DIPROSES'
-        ? '<button class="btn btn-primary" data-act="mulai-pengantaran">' + (p.IsPickup ? 'Konfirmasi Diambil' : 'Mulai Pengantaran') + '</button>'
-        : '<button class="btn btn-outline" data-act="lanjut-pengantaran-foto">Lanjutkan</button>') +
-    '</div>');
-  },
-
-  'pengantaran-foto': function () {
-    const p = state.pengantaranAktif;
-    const judul = p.IsPickup ? 'Bukti Serah Terima' : 'Bukti Pengantaran';
-    return '' +
-    '<div class="topbar"><button class="ic-btn" data-act="back-to-pengantaran-detail">←</button><h1>' + judul + '</h1><span class="badge info">' + esc(p.Status) + '</span></div>' +
-    '<div class="content">' +
-      '<div class="card">' +
-        '<div style="font-weight:800;font-size:13.5px;margin-bottom:10px;">' + (p.IsPickup ? 'Ambil foto bukti serah terima *' : 'Ambil foto bukti pengantaran *') + '</div>' +
-        (state.pengantaranFoto
-          ? '<div style="position:relative;border-radius:14px;overflow:hidden;margin-bottom:12px;">' +
-              '<img src="' + state.pengantaranFoto + '" style="width:100%;display:block;max-height:260px;object-fit:cover;" />' +
-              '<div style="position:absolute;top:8px;right:8px;width:26px;height:26px;border-radius:50%;background:var(--success);color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;">✓</div>' +
-            '</div>'
-          : '<div class="empty-state" style="padding:32px 12px;">📦<br/>Belum ada foto</div>') +
-        '<input type="file" id="in-foto-kamera" accept="image/*" capture="environment" style="display:none;" />' +
-        '<input type="file" id="in-foto-galeri" accept="image/*" style="display:none;" />' +
-        '<button class="btn btn-primary" data-act="ambil-foto" style="margin-bottom:8px;">📷 Ambil Foto</button>' +
-        '<button class="btn btn-outline" data-act="pilih-galeri">🖼 Pilih dari Galeri</button>' +
-      '</div>' +
-      '<div class="info-box"><div><b>Pastikan barang terlihat jelas</b>' + (p.IsPickup ? 'Foto menunjukkan barang saat diserahkan ke pelanggan di toko.' : 'Foto menunjukkan barang di lokasi tujuan.') + '</div></div>' +
-      '__ERROR__' +
-    '</div>' +
-    '<div class="footer-fixed">' +
-      '<button class="btn btn-primary" data-act="lanjut-selesaikan-pengantaran"' + (!state.pengantaranFoto ? ' disabled' : '') + '>Lanjutkan</button>' +
-    '</div>';
-  },
-
-  'pengantaran-selesai': function () {
-    const p = state.pengantaranAktif;
-    return '' +
-    '<div class="topbar"><button class="ic-btn" data-act="back-to-pengantaran-foto">←</button><h1>Selesaikan Pesanan</h1><span class="badge info">' + esc(p.Status) + '</span></div>' +
-    '<div class="content">' +
-      '<div class="card" style="text-align:center;">' +
-        '<div style="font-weight:800;font-size:13.5px;margin-bottom:10px;text-align:left;">Foto Bukti</div>' +
-        '<div style="position:relative;border-radius:14px;overflow:hidden;">' +
-          '<img src="' + state.pengantaranFoto + '" style="width:100%;display:block;max-height:220px;object-fit:cover;" />' +
-        '</div>' +
-        '<button class="btn btn-outline" data-act="ubah-foto" style="margin-top:10px;width:auto;padding:8px 14px;font-size:13px;">Ubah Foto</button>' +
-      '</div>' +
-      '<div class="field"><label>Catatan (Opsional)</label>' +
-        '<textarea id="in-catatan-selesai" rows="2" placeholder="Contoh: Pesanan diterima oleh Ibu di rumah.">' + esc(state.pengantaranCatatan) + '</textarea></div>' +
-    '</div>' +
-    '<div class="footer-fixed">' +
-      '<button class="btn btn-primary" data-act="selesaikan-pengantaran"' + (state.loading ? ' disabled' : '') + '>✓ Selesaikan Pesanan</button>' +
     '</div>';
   },
 
@@ -1291,26 +1069,108 @@ const VIEWS = {
     }).join('');
     return '' +
     '<div class="topbar"><button class="ic-btn" data-act="back-to-home">←</button><h1>Penerimaan Barang</h1>' +
-      '<button class="ic-btn" data-act="sinkron-katalog-produk" style="margin-right:6px;"' + (state.loading ? ' disabled' : '') + '>☁</button>' +
       '<button class="ic-btn" data-act="goto-penerimaan-buat">+</button></div>' +
     '<div class="content">' +
-      '<div class="card" style="display:flex;align-items:center;gap:10px;">' +
-        '<div style="flex:1;">' +
-          '<div style="font-weight:800;font-size:13.5px;">Katalog Produk (untuk Scan)</div>' +
-          '<div class="lbl" style="margin-top:2px;">' +
-            (state.produkCache
-              ? state.produkCacheCount + ' produk • tersinkron ' + fmtWaktu(state.produkCacheAt)
-              : 'Belum disinkron - scan barcode masih cek ke server tiap kali') +
-          '</div>' +
-        '</div>' +
-        '<button class="btn btn-primary" style="width:auto;padding:9px 14px;font-size:13px;" data-act="sinkron-katalog-produk"' + (state.loading ? ' disabled' : '') + '>' + (state.produkCache ? 'Sinkron Ulang' : 'Sinkron') + '</button>' +
-      '</div>' +
       '<div class="chip-row">' +
         ['SEMUA', 'DRAFT', 'SELESAI'].map(function (f) {
           return '<button class="chip' + (state.penerimaanFilter === f ? ' active' : '') + '" data-act="filter-penerimaan" data-f="' + f + '">' + f.charAt(0) + f.slice(1).toLowerCase() + '</button>';
         }).join('') +
       '</div>' +
       (rows || '<div class="empty-state">Belum ada penerimaan barang.</div>') +
+    '</div>';
+  },
+
+  'pengantaran-online': function () {
+    const filtered = state.pengantaranList.filter(function (p) {
+      return state.pengantaranFilter === 'SEMUA' ? true : p.Status === state.pengantaranFilter;
+    });
+    const rows = filtered.map(function (p) {
+      const statusB = pengStatusBadge(p.Status);
+      const tipeInfo = pengTipeInfo(p.Tipe);
+      const bayarB = pengBayarBadge(p.StatusBayar);
+      return '<div class="card card-clickable" data-act="buka-pengantaran" data-id="' + p.Id + '" style="cursor:pointer;">' +
+        '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;">' +
+          '<div style="font-weight:800;font-size:14.5px;">' + esc(p.Kode) + '</div>' +
+          '<span class="badge ' + statusB.cls + '">' + statusB.text + '</span>' +
+        '</div>' +
+        '<div class="row"><span class="lbl">Pelanggan</span><span class="val">' + esc(p.Pelanggan) + '</span></div>' +
+        '<div class="row"><span class="lbl">Tipe</span><span class="val">' + tipeInfo.icon + ' ' + tipeInfo.text + '</span></div>' +
+        (p.Tipe !== 'Pickup' ? '<div class="row"><span class="lbl">Alamat</span><span class="val">' + esc(p.Alamat || '-') + '</span></div>' : '') +
+        '<div class="row"><span class="lbl">Total</span><span class="val">Rp' + Number(p.Total || 0).toLocaleString('id-ID') + '</span></div>' +
+        '<div style="margin-top:8px;"><span class="badge ' + bayarB.cls + '">' + bayarB.text + '</span></div>' +
+      '</div>';
+    }).join('');
+    return '' +
+    '<div class="topbar"><button class="ic-btn" data-act="back-to-home">←</button><h1>Pengantaran Online</h1><div style="width:34px;"></div></div>' +
+    '<div class="content">' +
+      '<div class="chip-row">' +
+        [['SEMUA', 'Semua'], ['DIPROSES', 'Diproses'], ['DIANTAR', 'Diantar'], ['SELESAI', 'Selesai']].map(function (f) {
+          return '<button class="chip' + (state.pengantaranFilter === f[0] ? ' active' : '') + '" data-act="filter-pengantaran" data-f="' + f[0] + '">' + f[1] + '</button>';
+        }).join('') +
+      '</div>' +
+      (rows || '<div class="empty-state">Belum ada pesanan untuk diantar.<br>Pesanan muncul di sini begitu diproses kasir di POS.</div>') +
+    '</div>';
+  },
+
+  'pengantaran-online-detail': function () {
+    const p = state.pengantaranAktif;
+    const statusB = pengStatusBadge(p.Status);
+    const tipeInfo = pengTipeInfo(p.Tipe);
+    const bayarB = pengBayarBadge(p.StatusBayar);
+    const items = p.Items || [];
+    const itemRows = items.map(function (it) {
+      return '<div class="produk-item">' +
+        '<div class="info"><div class="nama">' + esc(it.nama) + '</div>' +
+        '<div class="meta">' + (it.qty || 0) + ' x Rp' + Number(it.harga || 0).toLocaleString('id-ID') + '</div></div>' +
+        '<span class="badge neutral">Rp' + Number(it.subtotal || 0).toLocaleString('id-ID') + '</span>' +
+      '</div>';
+    }).join('');
+    return '' +
+    '<div class="topbar"><button class="ic-btn" data-act="back-to-pengantaran-list">←</button><h1>' + esc(p.Kode) + '</h1>' +
+      '<span class="badge ' + statusB.cls + '">' + statusB.text + '</span></div>' +
+    '<div class="content">' +
+      '__ERROR__' +
+      '<div class="card">' +
+        '<div class="row" style="padding-top:0;"><span class="lbl">Pelanggan</span><span class="val">' + esc(p.Pelanggan) + '</span></div>' +
+        '<div class="row"><span class="lbl">Kontak</span><span class="val">' + esc(p.Kontak || '-') + '</span></div>' +
+        '<div class="row"><span class="lbl">Tipe</span><span class="val">' + tipeInfo.icon + ' ' + tipeInfo.text + '</span></div>' +
+        (p.Tipe !== 'Pickup' ? '<div class="row"><span class="lbl">Alamat</span><span class="val">' + esc(p.Alamat || '-') + '</span></div>' : '') +
+        '<div class="row"><span class="lbl">Pembayaran</span><span class="val"><span class="badge ' + bayarB.cls + '">' + bayarB.text + '</span></span></div>' +
+        '<div class="row"><span class="lbl">Total</span><span class="val">Rp' + Number(p.Total || 0).toLocaleString('id-ID') + '</span></div>' +
+        (p.Catatan ? '<div class="row"><span class="lbl">Catatan</span><span class="val">' + esc(p.Catatan) + '</span></div>' : '') +
+      '</div>' +
+      (itemRows ? '<div class="card"><div style="font-weight:700;font-size:13px;margin-bottom:8px;">Item Pesanan</div>' + itemRows + '</div>' : '') +
+      (p.Status === 'DIPROSES' ?
+        '<button class="btn btn-primary" data-act="mulai-pengantaran"' + (state.loading ? ' disabled' : '') + '>' +
+          (state.loading ? '<span class="spinner"></span>' : 'Mulai Pengantaran') + '</button>' : '') +
+      (p.Status === 'DIANTAR' ?
+        '<button class="btn btn-primary" data-act="goto-pengantaran-selesai">Selesaikan Pengantaran</button>' : '') +
+      (p.Status === 'SELESAI' ?
+        '<div class="info-box success"><div><b>Pengantaran Selesai</b>' + fmtWaktu(p.WaktuSelesai) +
+          (p.CatatanSelesai ? ' · ' + esc(p.CatatanSelesai) : '') + '</div></div>' +
+        (p.FotoUrl ? '<img src="' + esc(p.FotoUrl) + '" style="width:100%;border-radius:12px;" />' : '') : '') +
+    '</div>';
+  },
+
+  'pengantaran-online-selesai': function () {
+    const p = state.pengantaranAktif;
+    return '' +
+    '<div class="topbar"><button class="ic-btn" data-act="back-to-pengantaran-detail">←</button><h1>Selesaikan ' + esc(p.Kode) + '</h1><div style="width:34px;"></div></div>' +
+    '<div class="content">' +
+      '<div class="card" style="text-align:center;">' +
+        (state.fotoBuktiPengantaran ?
+          '<img src="' + state.fotoBuktiPengantaran + '" style="width:100%;border-radius:12px;margin-bottom:12px;" />' :
+          '<div class="empty-state" style="padding:26px 10px;">📷<br>Belum ada foto bukti serah terima.</div>') +
+        '<label class="btn btn-outline" for="in-po-foto">' + (state.fotoBuktiPengantaran ? 'Ganti Foto' : 'Ambil Foto Bukti') + '</label>' +
+        '<input type="file" accept="image/*" capture="environment" id="in-po-foto" style="display:none;" />' +
+      '</div>' +
+      '<div class="field"><label>Catatan (Opsional)</label>' +
+        '<textarea id="in-po-catatan-selesai" rows="2" placeholder="Contoh: diterima satpam"></textarea></div>' +
+      '__ERROR__' +
+    '</div>' +
+    '<div class="footer-fixed">' +
+      '<button class="btn btn-primary" data-act="submit-pengantaran-selesai"' + (state.loading ? ' disabled' : '') + '>' +
+        (state.loading ? '<span class="spinner"></span>' : 'Selesaikan Pengantaran') + '</button>' +
     '</div>';
   },
 
@@ -1354,8 +1214,6 @@ const VIEWS = {
         '<div class="row"><span class="lbl">No. Nota</span><span class="val">' + esc(p.NoNota || '-') + '</span></div>' +
         '<div class="row"><span class="lbl">Tanggal</span><span class="val">' + fmtTanggal(p.Tanggal) + '</span></div>' +
       '</div>' +
-      (!state.produkCache ?
-        '<div class="info-box" style="margin-bottom:14px;"><div><b>Katalog belum disinkron</b>Scan barcode masih cek ke server tiap kali (lebih lambat). Kembali ke daftar Penerimaan dan tekan tombol Sinkron dulu biar scan lebih cepat.</div></div>' : '') +
       '<button class="btn btn-primary" data-act="buka-scan" style="margin-bottom:14px;">📷 Scan Barcode Produk</button>' +
       '__ERROR__' +
       '<div class="row" style="padding:0 2px 8px;"><span class="lbl">Barang Diterima</span><span class="val">' + items.length + ' item • ' + totalQty + ' qty</span></div>' +
@@ -1620,7 +1478,7 @@ const VIEWS = {
       return '<div class="produk-item" data-act="buka-edit-selisih" data-id="' + i.ProdukId + '">' +
         '<div class="thumb">📦</div>' +
         '<div class="info"><div class="nama">' + esc(i.Nama) + '</div><div class="meta">' + esc(i.Barcode || '-') + ' · Rak ' + esc(i.Rak || '-') + '</div></div>' +
-        '<div class="right"><div class="sf selisih ' + selCls + '" style="margin:0;">' + (sel > 0 ? '+' : '') + sel + '</div><div class="sf-label">Sistem - · Fisik ' + i.StokFisik + '</div></div>' +
+        '<div class="right"><div class="sf selisih ' + selCls + '" style="margin:0;">' + (sel > 0 ? '+' : '') + sel + '</div><div class="sf-label">Sistem ' + i.StokSistem + ' · Fisik ' + i.StokFisik + '</div></div>' +
         '<div class="chev">›</div>' +
       '</div>';
     }).join('');
@@ -1858,14 +1716,19 @@ function bindEvents() {
   if (inHargaBaru) inHargaBaru.addEventListener('input', function (e) {
     e.target.value = e.target.value.replace(/[^0-9]/g, '');
   });
-  const inFotoKamera = document.getElementById('in-foto-kamera');
-  if (inFotoKamera) inFotoKamera.addEventListener('change', function (e) { pilihFotoPengantaran(e.target.files[0]); });
-  const inFotoGaleri = document.getElementById('in-foto-galeri');
-  if (inFotoGaleri) inFotoGaleri.addEventListener('change', function (e) { pilihFotoPengantaran(e.target.files[0]); });
-  const inCatatanSelesai = document.getElementById('in-catatan-selesai');
-  if (inCatatanSelesai) inCatatanSelesai.addEventListener('input', function (e) { state.pengantaranCatatan = e.target.value.slice(0, 200); preserveFocus('in-catatan-selesai'); });
   const inCatatanKoreksi = document.getElementById('in-catatankoreksi');
   if (inCatatanKoreksi) inCatatanKoreksi.addEventListener('input', function (e) { state.catatanKoreksiInput = e.target.value.slice(0, 200); render(); preserveFocus('in-catatankoreksi'); });
+  // Foto bukti Selesaikan Pengantaran - dibaca jadi data URL (base64) di HP langsung,
+  // dikirim sebagai fotoBase64 ke apiSelesaikanPengantaranOnline (PesananOnlineService.
+  // _simpanFotoBukti upload ke Drive di server, bukan disimpan mentah di Sheet).
+  const inFoto = document.getElementById('in-po-foto');
+  if (inFoto) inFoto.addEventListener('change', function (e) {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function () { state.fotoBuktiPengantaran = reader.result; state.error = ''; render(); };
+    reader.readAsDataURL(file);
+  });
   // OPTIMASI: auto-fokus + auto-select isi input stok fisik begitu layar dibuka,
   // petugas langsung ketik angka tanpa perlu tap ke field dulu - hemat 1 tap tiap produk.
   if (state.focusStokFisik) {
@@ -1892,19 +1755,16 @@ function handleAction(act, el) {
   if (act === 'goto-list-edit') { state.listOrigin = 'edit'; goto('list-edit'); refreshSesiListSilent(); return; }
   if (act === 'goto-penerimaan') { bukaPenerimaanList(); return; }
   if (act === 'goto-pengantaran') { bukaPengantaranList(); return; }
-  if (act === 'filter-pengantaran') { state.pengantaranFilter = el.getAttribute('data-f'); render(); return; }
-  if (act === 'pilih-pengantaran') { bukaPengantaranDetail(el.getAttribute('data-id')); return; }
   if (act === 'back-to-pengantaran-list') { bukaPengantaranList(); return; }
+  if (act === 'filter-pengantaran') { state.pengantaranFilter = el.getAttribute('data-f'); render(); return; }
+  if (act === 'buka-pengantaran') { bukaPengantaran(el.getAttribute('data-id')); return; }
   if (act === 'mulai-pengantaran') { mulaiPengantaran(); return; }
-  if (act === 'lanjut-pengantaran-foto') { state.pengantaranFoto = state.pengantaranAktif.Foto; goto('pengantaran-foto'); return; }
-  if (act === 'back-to-pengantaran-detail') { goto('pengantaran-detail'); return; }
-  if (act === 'ambil-foto') { document.getElementById('in-foto-kamera').click(); return; }
-  if (act === 'pilih-galeri') { document.getElementById('in-foto-galeri').click(); return; }
-  if (act === 'ubah-foto') { goto('pengantaran-foto'); return; }
-  if (act === 'lanjut-selesaikan-pengantaran') { lanjutSelesaikanPengantaran(); return; }
-  if (act === 'back-to-pengantaran-foto') { goto('pengantaran-foto'); return; }
-  if (act === 'selesaikan-pengantaran') { selesaikanPengantaran(); return; }
-  if (act === 'sinkron-katalog-produk') { sinkronKatalogProduk(); return; }
+  if (act === 'goto-pengantaran-selesai') { state.fotoBuktiPengantaran = ''; goto('pengantaran-online-selesai'); return; }
+  if (act === 'back-to-pengantaran-detail') { goto('pengantaran-online-detail'); return; }
+  if (act === 'submit-pengantaran-selesai') {
+    const catatan = document.getElementById('in-po-catatan-selesai').value.trim();
+    selesaikanPengantaran(catatan); return;
+  }
   if (act === 'goto-penerimaan-buat') { goto('penerimaan-buat'); return; }
   if (act === 'back-to-penerimaan-list') { bukaPenerimaanList(); return; }
   if (act === 'filter-penerimaan') { state.penerimaanFilter = el.getAttribute('data-f'); render(); return; }
@@ -2005,11 +1865,10 @@ function initApp() {
     'penerimaan-produk-baru': 'penerimaan',
     'penerimaan-review': 'penerimaan',
     'penerimaan-selesai': 'penerimaan',
-    'pengantaran-detail': 'pengantaran',
-    'pengantaran-foto': 'pengantaran',
-    'pengantaran-selesai': 'pengantaran'
+    'pengantaran-online-detail': 'pengantaran-online',
+    'pengantaran-online-selesai': 'pengantaran-online'
   };
-  const viewsTanpaSesi = ['home', 'list-mulai', 'list-edit', 'penerimaan', 'pengantaran'];
+  const viewsTanpaSesi = ['home', 'list-mulai', 'list-edit', 'penerimaan', 'pengantaran-online'];
 
   state.loading = true;
   render();
@@ -2019,14 +1878,6 @@ function initApp() {
       // Validasi token sekaligus ambil daftar sesi - kalau token sudah tidak
       // valid/kadaluarsa di server, api() akan melempar error (masuk ke catch).
       state.sesiList = await api('apiListStockOpnameUntukPetugas', { token: state.token });
-
-      // Pengantaran Online - dimuat sekalian di startup (bukan nunggu buka menu) supaya
-      // badge jumlah DIPROSES di Home langsung benar. Kegagalan di sini TIDAK bikin
-      // logout (beda dari sesiList di atas) - cukup badge tetap 0 sampai berhasil nanti.
-      try {
-        const pengantaran = await api('apiListPengantaranUntukPetugas', { token: state.token });
-        state.pengantaranList = (pengantaran || []).map(pengMapDariServer);
-      } catch (e) { /* diam - badge Pengantaran tetap 0, coba lagi saat menu dibuka */ }
 
       let targetView = fallbackView[saved.view] || saved.view;
 
@@ -2042,6 +1893,8 @@ function initApp() {
 
       state.view = targetView;
       simpanSesiTerakhir();
+      // Non-blocking, pola sama doLogin - badge "Pengantaran Online" Home nyusul.
+      refreshPengantaranListSilent();
     } catch (e) {
       // Token sudah tidak valid/kadaluarsa di server - bersihkan sesi tersimpan
       // dan pastikan mendarat rapi di halaman Login tanpa pesan error nyangkut.
