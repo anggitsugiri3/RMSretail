@@ -242,6 +242,7 @@ const state = {
   error: '',
   showPw: false,
   sesiList: [],
+  sesiLoadError: '',  // pesan gagal muat daftar sesi (ditampilkan kalau daftar kosong)
   sesi: null,        // header + Items + progress, sesi yang sedang dibuka
   listOrigin: 'mulai', // 'mulai' | 'edit' - dari menu mana Detail Sesi dibuka, dipakai tombol back
   filter: 'SEMUA',    // SEMUA | SUDAH | BELUM
@@ -416,33 +417,116 @@ function onBarcodeDetected(barcode) {
 }
 
 // ---- API helper --------------------------------------------------------
-async function api(action, params) {
+// Backend = Google Apps Script Web App. Latensinya TIDAK stabil: cold start, antrean eksekusi
+// paralel, sheet besar -> kadang 1 dtk, kadang 20+ dtk, kadang balasan error HTML tanpa CORS
+// (di browser muncul sebagai "Failed to fetch"). Jadi api() sengaja tahan banting:
+//  - timeout lebih longgar (40 dtk; upload foto/katalog besar 90 dtk), body ikut dihitung timeout
+//  - GAGAL SEMENTARA (timeout / jaringan / balasan bukan JSON) otomatis diulang HANYA untuk
+//    aksi yang aman diulang (baca, atau tulis idempoten) - lihat API_RETRY_SAFE
+//  - server balas kode BUSY (antre lock, handler belum jalan) selalu aman diulang
+//  - permintaan BACA identik yang sedang berjalan DIPAKAI BERSAMA (tidak nembak server 2x)
+//  - aksi tulis lain (buat draft, selesaikan, mulai antar, dst) TIDAK diulang otomatis supaya
+//    tidak dobel - pesan error menjelaskan kemungkinan sudah tersimpan
+const API_RETRY_SAFE = {
+  apiLogin: 1, apiListStockOpnameUntukPetugas: 1, apiGetStockOpnameDetailUntukPetugas: 1,
+  apiListPenerimaanBarang: 1, apiGetPenerimaanDetail: 1, apiListProdukUntukPenerimaan: 1,
+  apiCariProdukBarcode: 1, apiListPengantaranUntukPetugas: 1,
+  apiInputStokFisikPetugas: 1, // idempoten: menimpa nilai yang sama
+  apiSimpanItemPenerimaan: 1   // idempoten: replace qty baris produk itu
+};
+const API_DEDUPE = {
+  apiListStockOpnameUntukPetugas: 1, apiGetStockOpnameDetailUntukPetugas: 1,
+  apiListPenerimaanBarang: 1, apiGetPenerimaanDetail: 1, apiListProdukUntukPenerimaan: 1,
+  apiCariProdukBarcode: 1, apiListPengantaranUntukPetugas: 1
+};
+const API_TIMEOUT_MS = { def: 40000, apiListProdukUntukPenerimaan: 90000, apiSelesaikanPengantaranOnline: 90000 };
+const API_MAX_ATTEMPTS = 3;
+const apiInflight = {};
+
+function apiSleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+
+async function apiOnce(action, params, timeoutMs) {
   const controller = new AbortController();
-  const timeoutId = setTimeout(function () { controller.abort(); }, 25000); // 25 detik batas tunggu
-  let res;
+  const timeoutId = setTimeout(function () { controller.abort(); }, timeoutMs);
+  let text;
   try {
-    res = await fetch(BACKEND_URL, {
+    const res = await fetch(BACKEND_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // hindari CORS preflight OPTIONS (GAS doPost tidak menangani preflight)
       body: JSON.stringify({ action: action, params: params || {} }),
       signal: controller.signal
     });
+    text = await res.text(); // body dibaca DI DALAM batas timeout
   } catch (e) {
-    if (e.name === 'AbortError') {
-      throw new Error('Server tidak merespon (timeout 25 detik). Coba lagi, atau cek status server.');
-    }
-    throw new Error('Gagal terhubung ke server. Cek koneksi internet kamu.');
+    const timeout = !!(e && e.name === 'AbortError');
+    const err = new Error(timeout
+      ? 'Server tidak merespon (' + Math.round(timeoutMs / 1000) + ' detik).'
+      : 'Gagal terhubung ke server. Cek koneksi internet kamu.');
+    err.transient = true; err.timeout = timeout;
+    throw err;
   } finally {
     clearTimeout(timeoutId);
   }
   let json;
   try {
-    json = await res.json();
+    json = JSON.parse(text);
   } catch (e) {
-    throw new Error('Server mengembalikan respon tidak valid (bukan JSON). Cek Executions di Apps Script.');
+    const err = new Error('Server mengembalikan respon tidak valid (bukan JSON). Cek Executions di Apps Script.');
+    err.transient = true;
+    throw err;
   }
-  if (!json.success) throw new Error(json.message || 'Terjadi kesalahan pada server.');
+  if (!json || !json.success) {
+    const err = new Error((json && json.message) || 'Terjadi kesalahan pada server.');
+    err.code = json && json.code;
+    throw err;
+  }
   return json.data;
+}
+
+// Token ditolak server (session di CacheService server sudah hilang/kadaluarsa) - balik ke Login
+// dengan pesan jelas, bukan error acak di layar yang lagi dipakai.
+function sesiHabis() {
+  if (!state.token) return;
+  state.token = null; state.user = null; state.sesi = null;
+  goto('login');
+  state.error = 'Sesi habis. Silakan login lagi.';
+  render();
+}
+
+async function api(action, params) {
+  const retrySafe = !!API_RETRY_SAFE[action];
+  const dkey = API_DEDUPE[action] ? action + '|' + JSON.stringify(params || {}) : null;
+  if (dkey && apiInflight[dkey]) return apiInflight[dkey];
+
+  const run = (async function () {
+    const timeoutMs = API_TIMEOUT_MS[action] || API_TIMEOUT_MS.def;
+    let timeouts = 0;
+    for (let attempt = 1; ; attempt++) {
+      try {
+        return await apiOnce(action, params, timeoutMs);
+      } catch (e) {
+        if (e.code === 'AUTH_ERROR' && action !== 'apiLogin') sesiHabis();
+        if (e.timeout) timeouts++;
+        const boleh = attempt < API_MAX_ATTEMPTS && timeouts < 2 && (e.code === 'BUSY' || (e.transient && retrySafe));
+        if (!boleh) {
+          if (e.transient && !retrySafe) {
+            e.message += ' Aksi ini MUNGKIN sudah tersimpan - cek daftar dulu sebelum mengulang.';
+          } else if (e.transient) {
+            e.message += ' Sudah dicoba ' + attempt + 'x. Coba lagi sebentar.';
+          }
+          throw e;
+        }
+        await apiSleep(1000 * attempt);
+      }
+    }
+  })();
+
+  if (dkey) {
+    apiInflight[dkey] = run;
+    const bersih = function () { delete apiInflight[dkey]; };
+    run.then(bersih, bersih);
+  }
+  return run;
 }
 
 function esc(s) {
@@ -545,36 +629,62 @@ function bukaPengantaranList() {
   goto('pengantaran');
   refreshPengantaranListSilent();
 }
+// Layar yang boleh di-render ulang oleh refresh latar belakang (tidak ada input teks yang
+// bisa ketimpa).
+const PENG_VIEW_RENDER = ['home', 'pengantaran'];
+let pengBerjalan = false;   // 1 refresh pada satu waktu - poll & tombol manual tidak menumpuk
+let pengGagalBeruntun = 0;  // dipakai backoff polling
+let pengSuksesTerakhir = 0;
+
 function refreshPengantaranListSilent() {
-  const viewSaatDipanggil = state.view;
-  api('apiListPengantaranUntukPetugas', { token: state.token }).then(function (data) {
-    state.pengantaranList = (data || []).map(pengMapDariServer);
+  if (pengBerjalan) return Promise.resolve();
+  pengBerjalan = true;
+  return api('apiListPengantaranUntukPetugas', { token: state.token }).then(function (data) {
+    const baru = (data || []).map(pengMapDariServer);
+    const berubah = JSON.stringify(baru) !== JSON.stringify(state.pengantaranList) || state.pengantaranError;
+    state.pengantaranList = baru;
     state.pengantaranError = '';
-    if (state.view === viewSaatDipanggil || state.view === 'home') render();
+    pengGagalBeruntun = 0;
+    pengSuksesTerakhir = Date.now();
+    // Render ulang HANYA kalau data benar-benar berubah - tidak ada kedip/scroll loncat tiap poll.
+    if (berubah && PENG_VIEW_RENDER.indexOf(state.view) !== -1) render();
   }).catch(function (e) {
-    // BEDA dari sebelumnya (diem total) - list cache lama TETAP dipakai (tidak dihapus),
-    // tapi kalau memang lagi kosong (cache lama pun kosong), tandai pengantaranError
-    // supaya layar bisa bedain "beneran belum ada pesanan" vs "gagal ambil data" (mis.
-    // Web App belum di-deploy ulang setelah update kode - lihat catatan Controller.js).
+    // List cache lama TETAP dipakai (tidak dihapus). pengantaranError hanya ditampilkan kalau
+    // list memang kosong (lihat view 'pengantaran') - beda "belum ada pesanan" vs "gagal ambil data".
+    pengGagalBeruntun++;
     state.pengantaranError = (e && e.message) || 'Gagal memuat data pengantaran.';
-    if (state.view === viewSaatDipanggil || state.view === 'home') render();
-  });
+    if (state.pengantaranList.length === 0 && PENG_VIEW_RENDER.indexOf(state.view) !== -1) render();
+  }).then(function () { pengBerjalan = false; });
 }
 
-// BARU - polling ringan Pengantaran Online: sebelumnya list HANYA diambil sekali saat
-// initApp()/buka menu, jadi kalau kurir lagi diam di layar Home/Pengantaran pas kasir
-// proses pesanan baru di POS Desktop, gak ada yang nongol sampai kurir keluar-masuk menu
-// manual. Interval ini jalan terus di background (dipanggil sekali di bawah initApp()),
-// TAPI cuma benar-benar nembak API kalau kondisinya relevan (sudah login DAN sedang di
-// layar yang nampilin data Pengantaran) - supaya tidak boros baterai/kuota pas kurir lagi
-// buka layar lain (mis. Stock Opname).
-const PENGANTARAN_POLL_MS = 20000;
+// Polling ringan Pengantaran Online (kurir diam di Home/Pengantaran, kasir proses pesanan baru
+// di POS -> harus nongol tanpa keluar-masuk menu). PERBAIKAN (penyebab "server tidak merespon"):
+// dulu setInterval 20 dtk TANPA cek apakah request sebelumnya sudah selesai. Saat server lambat
+// (>20 dtk) request menumpuk, memperlambat server lebih jauh (tiap poll = baca sheet di GAS),
+// lalu semua timeout. Sekarang: setTimeout berantai (jadwal berikutnya baru dibuat SESUDAH
+// yang sekarang selesai), berhenti saat tab/app tidak terlihat, dan backoff eksponensial
+// (30 dtk -> 60 -> 120 -> maks 180) selama server masih gagal.
+const PENGANTARAN_POLL_MS = 30000;
+const PENGANTARAN_POLL_MAX_MS = 180000;
 function mulaiPollingPengantaran() {
-  setInterval(function () {
-    const viewRelevan = ['home', 'pengantaran', 'pengantaran-detail'];
-    if (!state.token || viewRelevan.indexOf(state.view) === -1) return;
-    refreshPengantaranListSilent();
-  }, PENGANTARAN_POLL_MS);
+  function jadwalkan() {
+    const jeda = Math.min(PENGANTARAN_POLL_MS * Math.pow(2, pengGagalBeruntun), PENGANTARAN_POLL_MAX_MS);
+    setTimeout(async function () {
+      const viewRelevan = ['home', 'pengantaran', 'pengantaran-detail'];
+      if (state.token && !document.hidden && viewRelevan.indexOf(state.view) !== -1) {
+        await refreshPengantaranListSilent();
+      }
+      jadwalkan();
+    }, jeda);
+  }
+  jadwalkan();
+  // Balik ke app setelah lama di background: segarkan segera (kalau sudah basi), bukan nunggu jadwal.
+  document.addEventListener('visibilitychange', function () {
+    if (!document.hidden && state.token && PENG_VIEW_RENDER.indexOf(state.view) !== -1 &&
+        Date.now() - pengSuksesTerakhir > PENGANTARAN_POLL_MS) {
+      refreshPengantaranListSilent();
+    }
+  });
 }
 
 function bukaPengantaranDetail(id) {
@@ -881,8 +991,15 @@ function doLogin(username, password) {
     const data = await api('apiLogin', { username: username, password: password });
     state.token = data.token;
     state.user = data.user;
-    await refreshSesiList();
+    state.sesiLoadError = '';
+    // Login SUDAH berhasil di titik ini. Gagal/lambat memuat daftar sesi TIDAK boleh membuat
+    // login tampak gagal (dulu: error "server tidak merespon" padahal token sudah didapat) -
+    // lanjut ke Home, daftar dicoba lagi diam-diam di belakang.
+    try { await refreshSesiList(); } catch (e) { state.sesiLoadError = (e && e.message) || 'Gagal memuat daftar sesi.'; }
+    if (!state.token) return; // sesi ditolak server di tengah jalan -> sudah dialihkan ke Login
     goto('home');
+    if (state.sesiLoadError) refreshSesiListSilent();
+    refreshPengantaranListSilent(); // badge Pengantaran di Home langsung benar
   });
 }
 
@@ -898,8 +1015,22 @@ function refreshSesiListSilent() {
   const viewSaatDipanggil = state.view;
   api('apiListStockOpnameUntukPetugas', { token: state.token }).then(function (data) {
     state.sesiList = data;
+    state.sesiLoadError = '';
     if (state.view === viewSaatDipanggil) { render(); }
-  }).catch(function () { /* diam - list cache lama tetap dipakai, bukan error fatal */ });
+  }).catch(function (e) {
+    // list cache lama tetap dipakai; kalau memang kosong, layar daftar menampilkan pesan + Coba Lagi
+    state.sesiLoadError = (e && e.message) || 'Gagal memuat daftar sesi.';
+    if (state.view === viewSaatDipanggil && state.sesiList.length === 0) { render(); }
+  });
+}
+
+// Layar daftar sesi kosong: bedakan "memang belum ada sesi" vs "gagal memuat" (+ tombol Coba Lagi).
+function sesiKosongHtml(pesanKosong) {
+  if (state.sesiLoadError && state.sesiList.length === 0) {
+    return '<div class="empty-state" style="color:var(--danger);">⚠ ' + esc(state.sesiLoadError) +
+      '<div style="margin-top:10px;"><button class="btn btn-primary" data-act="retry-sesi">Coba Lagi</button></div></div>';
+  }
+  return '<div class="empty-state">' + pesanKosong + '</div>';
 }
 
 // Sesi masuk menu "Mulai SO" kalau belum Selesai (masih perlu dihitung petugas).
@@ -932,6 +1063,7 @@ function bukaEditSelisih(item) {
 
 function sinkronSekarang() {
   guarded(async function () {
+    await soSaveChain; // tunggu simpanan yang masih antre - kalau tidak, data server yang belum terbarui menimpa input lokal
     state.sesi = await api('apiGetStockOpnameDetailUntukPetugas', { token: state.token, stockOpnameId: state.sesi.Id });
     state.lastSync = new Date();
     showToast('Sinkron berhasil.');
@@ -994,23 +1126,54 @@ function simpanStokFisik() {
     goto('proses');
   }
 
-  api('apiInputStokFisikPetugas', {
-    token: state.token,
-    stockOpnameId: state.sesi.Id,
-    produkId: item.ProdukId,
-    stokFisik: qty,
-    catatan: catatan
-  }).then(function (items) {
-    state.sesi.Items = items; // sinkron ulang dari server begitu selesai
-    recomputeProgress();
-    render();
-  }).catch(function (e) {
-    // Gagal sync ke server - balikin status jadi belum dihitung biar KEDATA, jangan diam-diam
-    // ilang. Petugas dikasih tau via toast, tapi alur kerja tetap gak ke-block.
-    item.Dihitung = false;
-    recomputeProgress();
-    state.toastMsg = 'Gagal sinkron "' + item.Nama + '": ' + e.message + '. Coba input ulang.';
-    render();
+  antrekanSimpanStok(item, qty, catatan, state.sesi.Id);
+}
+
+// Toast tanpa render() - dipakai saat layar Input Stok sedang dipakai mengetik (render ulang
+// akan menutup keyboard / menghilangkan fokus kolom).
+function toastTanpaRender(msg) {
+  const t = document.createElement('div');
+  t.className = 'toast';
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(function () { if (t.parentNode) t.parentNode.removeChild(t); }, 3500);
+}
+
+// ANTRIAN simpan stok fisik: SATU request pada satu waktu, urut sesuai input. PERBAIKAN: dulu
+// tiap produk yang di-input langsung menembak server tanpa menunggu yang sebelumnya - petugas
+// yang input cepat (10 produk / 30 detik) menumpuk 10 request paralel, masing-masing menulis ulang
+// data sesi di server: saling timpa (data hilang/dobel), makin lambat, lalu timeout massal.
+// Tampilan tetap INSTAN (state lokal diperbarui duluan di simpanStokFisik) - antrian hanya
+// mengatur pengiriman ke server di belakang layar.
+let soSaveChain = Promise.resolve();
+function antrekanSimpanStok(item, qty, catatan, sesiId) {
+  soSaveChain = soSaveChain.then(function () {
+    return api('apiInputStokFisikPetugas', {
+      token: state.token,
+      stockOpnameId: sesiId,
+      produkId: item.ProdukId,
+      stokFisik: qty,
+      catatan: catatan
+    }).then(function (items) {
+      // Gabung HANYA baris produk ini dari balasan server. JANGAN timpa seluruh Items: produk
+      // lain yang baru di-input & masih antre belum ada di balasan ini, akan tampak "belum
+      // dihitung" lagi kalau ikut ketimpa.
+      if (!state.sesi || state.sesi.Id !== sesiId) return;
+      const dariServer = (items || []).filter(function (x) { return String(x.ProdukId) === String(item.ProdukId); })[0];
+      if (dariServer) {
+        const idx = state.sesi.Items.findIndex(function (x) { return String(x.ProdukId) === String(item.ProdukId); });
+        if (idx !== -1) Object.assign(state.sesi.Items[idx], dariServer);
+      }
+      recomputeProgress();
+      if (state.view !== 'input') render(); // jangan render ulang saat petugas sedang mengetik
+    }).catch(function (e) {
+      // Gagal sync ke server - balikin status jadi belum dihitung biar KEDATA, jangan diam-diam
+      // ilang. Antrian TETAP jalan untuk produk berikutnya.
+      item.Dihitung = false;
+      if (state.sesi && state.sesi.Id === sesiId) recomputeProgress();
+      const pesan = 'Gagal sinkron "' + item.Nama + '": ' + ((e && e.message) || 'error') + ' Input ulang produk ini.';
+      if (state.view === 'input') { toastTanpaRender(pesan); } else { state.toastMsg = pesan; render(); }
+    });
   });
 }
 
@@ -1025,6 +1188,7 @@ function recomputeProgress() {
 
 function selesaikanOpname() {
   guarded(async function () {
+    await soSaveChain; // pastikan semua simpanan stok fisik yang antre sudah sampai server dulu
     const updated = await api('apiSelesaikanOpnamePetugas', { token: state.token, stockOpnameId: state.sesi.Id });
     // Jangan biarin field RakDipilih dari response nimpa kalau bentuknya beda
     // (server kadang balikin string, bukan array) - pertahanin array asli.
@@ -1520,7 +1684,7 @@ const VIEWS = {
     '<div class="topbar"><button class="ic-btn" data-act="back-to-home">←</button><h1>Mulai SO</h1><div style="width:34px;"></div></div>' +
     '<div class="content">' +
       '<div class="info-box"><div><b>Sesi Tersedia</b>Pilih sesi stock opname yang akan dikerjakan.</div></div>' +
-      (cards || '<div class="empty-state">Belum ada sesi Stock Opname untuk kamu kerjakan.</div>') +
+      (cards || sesiKosongHtml('Belum ada sesi Stock Opname untuk kamu kerjakan.')) +
     '</div>';
   },
 
@@ -1546,7 +1710,7 @@ const VIEWS = {
     '<div class="topbar"><button class="ic-btn" data-act="back-to-home">←</button><h1>Edit SO</h1><div style="width:34px;"></div></div>' +
     '<div class="content">' +
       '<div class="info-box"><div><b>Sesi Selesai</b>Pilih sesi buat cek atau koreksi selisih stok.</div></div>' +
-      (cards || '<div class="empty-state">Belum ada sesi Stock Opname yang bisa diedit.</div>') +
+      (cards || sesiKosongHtml('Belum ada sesi Stock Opname yang bisa diedit.')) +
     '</div>';
   },
 
@@ -1932,6 +2096,7 @@ function handleAction(act, el) {
   if (act === 'goto-pengantaran') { bukaPengantaranList(); return; }
   if (act === 'filter-pengantaran') { state.pengantaranFilter = el.getAttribute('data-f'); render(); return; }
   if (act === 'retry-pengantaran') { refreshPengantaranListSilent(); return; }
+  if (act === 'retry-sesi') { refreshSesiListSilent(); return; }
   if (act === 'pilih-pengantaran') { bukaPengantaranDetail(el.getAttribute('data-id')); return; }
   if (act === 'back-to-pengantaran-list') { bukaPengantaranList(); return; }
   if (act === 'mulai-pengantaran') { mulaiPengantaran(); return; }
