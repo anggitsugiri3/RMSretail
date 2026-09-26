@@ -33,7 +33,11 @@
   .ic-btn.tap-flash,.scan-btn.tap-flash,.stepper.tap-flash button.tap-flash{background:#E5E9F0 !important;}
   .btn-primary.tap-flash{background:var(--primary-hover) !important;}
   .btn-outline.tap-flash{background:#F3F4F6 !important;}
-  html,body{margin:0;padding:0;background:#EEF0F4;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:var(--gray-900);touch-action:manipulation;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;padding:0;background:#EEF0F4;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:var(--gray-900);touch-action:manipulation;-webkit-tap-highlight-color:transparent;overscroll-behavior-y:contain;}
+  /* Pull-to-refresh: lihat IIFE di bawah initApp(). contain di atas matiin pull-to-refresh
+     bawaan browser (kalau tidak, bisa dobel kepicu bareng gesture custom kita). */
+  #pull-indicator.spin{animation:pull-spin .6s linear infinite;}
+  @keyframes pull-spin{to{transform:translate(-50%,14px) rotate(360deg);}}
   #shell{max-width:420px;margin:0 auto;min-height:100vh;background:var(--bg);display:flex;flex-direction:column;position:relative;}
   .statusbar{height:14px;}
   .topbar{display:flex;align-items:center;gap:10px;padding:14px 16px;background:var(--card);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:5;}
@@ -579,6 +583,43 @@ function pengBadgeBayar(statusBayar) {
   return map[statusBayar] || { text: '? Cek Status Bayar', cls: 'neutral' };
 }
 
+// Catatan pengantaran kadang berisi link lokasi GPS pelanggan, format:
+// "📍 Lokasi pelanggan: https://www.google.com/maps?q=lat,lng (akurasi ±N m)".
+// Ambil link-nya doang dari teks Catatan buat tombol "Lihat di Google Maps"
+// di Detail Pesanan. Tombol tidak tampil kalau tidak ketemu link (null).
+function pengCariMapsUrl(catatan) {
+  if (!catatan) return null;
+  const m = String(catatan).match(/https?:\/\/\S+/);
+  return m ? m[0].replace(/[.,)]+$/, '') : null;
+}
+
+// p.Catatan dari server kadang gabungan 2 hal jadi 1 string: catatan bebas
+// (mis. "Jangan terlalu pedas") + info lokasi GPS ("📍 Lokasi pelanggan: <url>
+// (akurasi ±N m)") - nempel di belakangnya. Pisahkan di sini pakai penanda
+// "📍" biar di Detail Pesanan tampil jadi 2 baris sendiri2 (lihat
+// pengBarisCatatanLokasi), bukan numpuk 1 baris panjang campur aduk.
+function pengPisahCatatan(catatan) {
+  if (!catatan) return { catatan: '', lokasi: '' };
+  const teks = String(catatan);
+  const idx = teks.indexOf('📍');
+  if (idx === -1) return { catatan: teks.trim(), lokasi: '' };
+  return {
+    catatan: teks.slice(0, idx).trim(),
+    lokasi: teks.slice(idx).replace(/^📍\s*Lokasi pelanggan:\s*/i, '').trim()
+  };
+}
+
+// Render baris "Catatan" & "Lokasi Pelanggan" (terpisah) + tombol buka Maps
+// buat card Detail Pesanan di view 'pengantaran-detail'.
+function pengBarisCatatanLokasi(p) {
+  const bagian = pengPisahCatatan(p.Catatan);
+  const mapsUrl = pengCariMapsUrl(bagian.lokasi);
+  return '' +
+    (bagian.catatan ? '<div class="row"><span class="lbl">Catatan</span><span class="val" style="text-align:right;max-width:210px;">' + esc(bagian.catatan) + '</span></div>' : '') +
+    (bagian.lokasi ? '<div class="row"><span class="lbl">Lokasi Pelanggan</span><span class="val" style="text-align:right;max-width:210px;">' + esc(bagian.lokasi) + '</span></div>' : '') +
+    (mapsUrl ? '<button class="btn btn-outline" style="margin-top:10px;" data-act="buka-maps-pelanggan" data-url="' + esc(mapsUrl) + '">📍 Lihat di Aplikasi Google Maps</button>' : '');
+}
+
 // Ubah 1 baris respons server (Kode/Items/FotoUrl/dst - lihat PesananOnlineModel.js)
 // jadi bentuk yang dipakai render view di bawah (Id/Waktu/Produk/Foto - field lama,
 // TIDAK diubah supaya diff minimal). `_rowId` (Id UUID asli) disimpan terpisah, dipakai
@@ -798,14 +839,25 @@ async function guarded(fn) {
 }
 
 // ---- Persist sesi login & halaman terakhir (localStorage) ---------------
-// PERBAIKAN: sesi login SENGAJA tidak lagi disimpan - tiap refresh/buka ulang
-// app harus login lagi. simpanSesiTerakhir() dibiarkan no-op (bukan dihapus)
-// supaya semua pemanggil (goto(), doLogin(), initApp(), dst) tetap aman jalan
-// tanpa perlu diubah satu-satu.
+// LOGIN CEPAT: device 1 petugas tetap (bukan tablet gantian toko/gudang) -
+// sesi (token+user+halaman terakhir) disimpan di localStorage supaya buka
+// app lagi langsung nyangkut, tidak perlu isi username/password tiap kali.
+// Dipanggil tiap goto() pindah layar & sesudah initApp() pulihkan sesi.
+// Logout (act 'logout') tetap hapusSesiTersimpan() - device pindah tangan
+// masih wajib login manual.
 const SESSION_KEY = 'soPetugasSession';
 
 function simpanSesiTerakhir() {
-  // no-op - lihat catatan PERBAIKAN di atas.
+  if (!state.token) return; // belum login - tidak ada sesi buat disimpan
+  try {
+    localStorage.setItem(SESSION_KEY, JSON.stringify({
+      token: state.token,
+      user: state.user,
+      view: state.view,
+      listOrigin: state.listOrigin,
+      sesiId: state.sesi ? state.sesi.Id : null
+    }));
+  } catch (e) { /* localStorage tidak tersedia - login cepat skip, app tetap jalan normal */ }
 }
 
 function hapusSesiTersimpan() {
@@ -1398,7 +1450,7 @@ const VIEWS = {
         '<div class="row"><span class="lbl">Pelanggan</span><span class="val">' + esc(p.Pelanggan) + '</span></div>' +
         '<div class="row"><span class="lbl">Kontak</span><span class="val">' + esc(p.Kontak) + '</span></div>' +
         '<div class="row"><span class="lbl">Alamat</span><span class="val" style="text-align:right;max-width:210px;">' + esc(p.Alamat) + '</span></div>' +
-        (p.Catatan ? '<div class="row"><span class="lbl">Catatan</span><span class="val" style="text-align:right;max-width:210px;">' + esc(p.Catatan) + '</span></div>' : '') +
+        pengBarisCatatanLokasi(p) +
       '</div>' +
       '<div class="card">' +
         '<div style="font-weight:800;font-size:13.5px;margin-bottom:8px;">Detail Produk (' + p.Produk.length + ')</div>' +
@@ -2102,6 +2154,14 @@ function handleAction(act, el) {
   if (act === 'mulai-pengantaran') { mulaiPengantaran(); return; }
   if (act === 'lanjut-pengantaran-foto') { state.pengantaranFoto = state.pengantaranAktif.Foto; goto('pengantaran-foto'); return; }
   if (act === 'back-to-pengantaran-detail') { goto('pengantaran-detail'); return; }
+  if (act === 'buka-maps-pelanggan') {
+    // Link https://www.google.com/maps?q=lat,lng - dibuka tab/window baru.
+    // Di HP (Android/iOS), OS otomatis tawarkan buka via app Google Maps
+    // kalau terpasang; kalau tidak, fallback ke browser.
+    const url = el.getAttribute('data-url');
+    if (url) window.open(url, '_blank');
+    return;
+  }
   if (act === 'ambil-foto') { document.getElementById('in-foto-kamera').click(); return; }
   if (act === 'pilih-galeri') { document.getElementById('in-foto-galeri').click(); return; }
   if (act === 'ubah-foto') { goto('pengantaran-foto'); return; }
@@ -2186,10 +2246,6 @@ function handleAction(act, el) {
 // Login). Kalau token sudah kadaluarsa/invalid di server, otomatis fallback
 // ke Login (tanpa nyangkut/nge-blank).
 function initApp() {
-  // PERBAIKAN: sesi login tidak lagi dipulihkan - selalu mulai dari Login.
-  // hapusSesiTersimpan() jaga-jaga bersihin sisa data lama (kalau perangkat
-  // masih nyimpen SESSION_KEY dari versi app sebelum perbaikan ini).
-  hapusSesiTersimpan();
   const saved = bacaSesiTersimpan();
   if (!saved || !saved.token) { render(); return; }
 
@@ -2265,6 +2321,63 @@ function initApp() {
     }
   })();
 }
+
+// ---- Pull-to-refresh (tarik ke bawah di puncak layar) --------------------
+// App ini PWA (manifest.json + apple-mobile-web-app-capable) - kalau ditambah
+// ke homescreen, jalan standalone TANPA tombol reload browser. .content juga
+// scroll sendiri (bukan document), jadi pull-to-refresh bawaan Chrome/Safari
+// pun tidak kepicu. Gesture ini gantiin keduanya: tarik cukup jauh dari
+// puncak -> location.reload(). Aman buat sesi - Login Cepat (simpanSesiTerakhir/
+// bacaSesiTersimpan di initApp) sudah pulihkan token otomatis, jadi reload
+// TIDAK nge-logout, cuma ambil ulang data + versi app terbaru dari server.
+(function () {
+  const AMBANG = 70;  // px jarak tarik buat memicu reload
+  const MAKS = 100;   // px batas visual biar indikator tidak ketarik kelewat jauh
+  let target = null, startY = null, jarak = 0, memicu = false;
+
+  const indikator = document.createElement('div');
+  indikator.id = 'pull-indicator';
+  indikator.textContent = '↓';
+  indikator.style.cssText = 'position:fixed;top:8px;left:50%;width:34px;height:34px;' +
+    'border-radius:50%;background:#fff;border:1px solid #E5E7EB;box-shadow:0 2px 8px rgba(0,0,0,.15);' +
+    'display:flex;align-items:center;justify-content:center;font-size:15px;color:#2F6FED;' +
+    'z-index:9999;opacity:0;transform:translate(-50%,-60px);pointer-events:none;';
+  document.body.appendChild(indikator);
+
+  document.addEventListener('touchstart', function (e) {
+    // Cuma aktif kalau jari mulai dari dalam .content DAN posisinya sudah di puncak
+    // (scrollTop 0) - supaya tidak ganggu scroll biasa di tengah/bawah daftar.
+    const el = e.target.closest('.content');
+    if (!el || el.scrollTop > 0 || state.loading || memicu) { target = null; return; }
+    target = el; startY = e.touches[0].clientY; jarak = 0;
+  }, { passive: true });
+
+  document.addEventListener('touchmove', function (e) {
+    if (!target || startY === null) return;
+    const dy = e.touches[0].clientY - startY;
+    if (dy <= 0) { jarak = 0; indikator.style.opacity = '0'; return; } // cuma tarik ke bawah dipakai
+    jarak = Math.min(dy * 0.5, MAKS); // dibagi 2 - kasih efek "berat" ditarik, bukan 1:1
+    indikator.style.transition = 'none';
+    indikator.style.opacity = String(Math.min(jarak / AMBANG, 1));
+    indikator.style.transform = 'translate(-50%,' + (jarak - 60) + 'px) rotate(' + (jarak * 3) + 'deg)';
+  }, { passive: true });
+
+  document.addEventListener('touchend', function () {
+    if (!target) return;
+    indikator.style.transition = 'transform .15s ease,opacity .15s ease';
+    if (jarak >= AMBANG * 0.7) {
+      memicu = true;
+      indikator.style.opacity = '1';
+      indikator.style.transform = 'translate(-50%,14px)';
+      indikator.classList.add('spin');
+      setTimeout(function () { location.reload(); }, 250);
+    } else {
+      indikator.style.opacity = '0';
+      indikator.style.transform = 'translate(-50%,-60px)';
+    }
+    target = null; startY = null; jarak = 0;
+  }, { passive: true });
+})();
 
 initApp();
 mulaiPollingPengantaran();
