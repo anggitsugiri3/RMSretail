@@ -620,6 +620,36 @@ function pengBarisCatatanLokasi(p) {
     (mapsUrl ? '<button class="btn btn-outline" style="margin-top:10px;" data-act="buka-maps-pelanggan" data-url="' + esc(mapsUrl) + '">📍 Lihat di Aplikasi Google Maps</button>' : '');
 }
 
+// wa.me butuh nomor kode negara di depan tanpa 0/+ (mis. "62858...", bukan
+// "0858..."/"+62858..."). p.Kontak dari server sudah tanpa 0 di depan (lihat
+// contoh di Detail Pesanan), tapi dijaga di sini kalau formatnya beda-beda.
+function pengNomorWa(kontak) {
+  if (!kontak) return null;
+  let n = String(kontak).replace(/\D/g, '');
+  if (!n) return null;
+  if (n.charAt(0) === '0') n = '62' + n.slice(1);
+  else if (n.slice(0, 2) !== '62') n = '62' + n;
+  return n;
+}
+
+// Pesan pembuka dipakai kurir tiap mulai chat pelanggan lewat WA. "Aini Mart"
+// masih hardcode - gampang diganti 1 tempat ini kalau nama toko berubah.
+function pengPesanWaAwal() {
+  return 'Hallo ka saya driver dari Aini Mart mau nganter pesenannya';
+}
+
+// Tombol ikon WA kecil di sebelah nomor Kontak, Detail Pesanan - tap langsung
+// buka chat WhatsApp pelanggan, pesan pembuka di atas sudah keisi otomatis.
+// String kosong (tidak render apa2) kalau nomor Kontak tidak valid/kosong.
+function pengTombolWa(p) {
+  const nomor = pengNomorWa(p.Kontak);
+  if (!nomor) return '';
+  const url = 'https://wa.me/' + nomor + '?text=' + encodeURIComponent(pengPesanWaAwal());
+  return '<button class="ic-btn" style="width:26px;height:26px;border-radius:50%;background:#25D366;border:none;padding:0;display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;" data-act="wa-pelanggan" data-url="' + esc(url) + '" aria-label="Chat WhatsApp pelanggan">' +
+    '<svg width="14" height="14" viewBox="0 0 24 24" fill="#fff"><path d="M12 2C6.48 2 2 6.03 2 11c0 2.08.86 3.97 2.28 5.5L3 22l5.76-1.5C10 21 11 21 12 21c5.52 0 10-4.03 10-9S17.52 2 12 2z"/></svg>' +
+    '</button>';
+}
+
 // Ubah 1 baris respons server (Kode/Items/FotoUrl/dst - lihat PesananOnlineModel.js)
 // jadi bentuk yang dipakai render view di bawah (Id/Waktu/Produk/Foto - field lama,
 // TIDAK diubah supaya diff minimal). `_rowId` (Id UUID asli) disimpan terpisah, dipakai
@@ -1448,7 +1478,7 @@ const VIEWS = {
           '<span class="badge ' + b.cls + '">' + b.text + '</span>' +
         '</div>' +
         '<div class="row"><span class="lbl">Pelanggan</span><span class="val">' + esc(p.Pelanggan) + '</span></div>' +
-        '<div class="row"><span class="lbl">Kontak</span><span class="val">' + esc(p.Kontak) + '</span></div>' +
+        '<div class="row"><span class="lbl">Kontak</span><span class="val" style="display:inline-flex;align-items:center;gap:8px;justify-content:flex-end;">' + esc(p.Kontak) + pengTombolWa(p) + '</span></div>' +
         '<div class="row"><span class="lbl">Alamat</span><span class="val" style="text-align:right;max-width:210px;">' + esc(p.Alamat) + '</span></div>' +
         pengBarisCatatanLokasi(p) +
       '</div>' +
@@ -2154,6 +2184,7 @@ function handleAction(act, el) {
   if (act === 'mulai-pengantaran') { mulaiPengantaran(); return; }
   if (act === 'lanjut-pengantaran-foto') { state.pengantaranFoto = state.pengantaranAktif.Foto; goto('pengantaran-foto'); return; }
   if (act === 'back-to-pengantaran-detail') { goto('pengantaran-detail'); return; }
+  if (act === 'wa-pelanggan') { window.open(el.getAttribute('data-url'), '_blank'); return; }
   if (act === 'buka-maps-pelanggan') {
     // Link https://www.google.com/maps?q=lat,lng - dibuka tab/window baru.
     // Di HP (Android/iOS), OS otomatis tawarkan buka via app Google Maps
